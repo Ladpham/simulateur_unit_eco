@@ -144,7 +144,7 @@ with left:
     cout_total_pct = cout_paiement_pct + cout_liquidite_10j_pct + defaut_30j_pct
     contribution_margin_pct = revenu_pct - cout_total_pct
 
-    # Contribution value par mois en k€
+    # Contribution profit par mois en k€
     contribution_value_k = loan_book_k * cycles_per_month * contribution_margin_pct / 100
 
     st.caption(f"Coût de liquidité annualisé ≈ **{taux_liquidite_annuel_pct:.1f} %**")
