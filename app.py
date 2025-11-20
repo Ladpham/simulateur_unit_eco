@@ -107,18 +107,53 @@ with left:
             label_visibility="collapsed",
         )
 
-    # Calculs
+    # ---------- VARIABLES DE VOLUME ----------
+    st.markdown("")
+    st.subheader("Variables de volume")
+
+    row5 = st.columns([0.6, 0.4])
+    with row5[0]:
+        st.markdown("Cycles de liquidité / mois")
+    with row5[1]:
+        cycles_per_month = st.number_input(
+            "    ",
+            min_value=0.0,
+            max_value=100.0,
+            value=2.9,
+            step=0.1,
+            key="cycles_per_month",
+            label_visibility="collapsed",
+        )
+
+    row6 = st.columns([0.6, 0.4])
+    with row6[0]:
+        st.markdown("Loan book moyen (k€)")
+    with row6[1]:
+        loan_book_k = st.number_input(
+            "     ",
+            min_value=0.0,
+            max_value=100000.0,
+            value=100.0,
+            step=10.0,
+            key="loan_book_k",
+            label_visibility="collapsed",
+        )
+
+    # ---------- CALCULS ----------
     taux_liquidite_annuel_pct = cout_liquidite_10j_pct * 365 / DUREE_PERIODE_LIQUIDITE_JOURS
     cout_total_pct = cout_paiement_pct + cout_liquidite_10j_pct + defaut_30j_pct
     contribution_margin_pct = revenu_pct - cout_total_pct
+
+    # Contribution value par mois en k€
+    contribution_value_k = loan_book_k * cycles_per_month * contribution_margin_pct / 100
 
     st.caption(f"Coût de liquidité annualisé ≈ **{taux_liquidite_annuel_pct:.1f} %**")
 
 with right:
     st.subheader("Contribution")
 
+    # ---------- Contribution margin ----------
     st.markdown("Contribution margin / trx")
-    # Gros cadre pour la margin, couleurs Waribei
     st.markdown(
         f"""
         <div style="
@@ -134,6 +169,32 @@ with right:
         </div>
         """,
         unsafe_allow_html=True,
+    )
+
+    st.markdown("")
+
+    # ---------- Contribution value ----------
+    st.markdown("Contribution value / mois")
+    st.markdown(
+        f"""
+        <div style="
+            border:2px solid #1B5A43;
+            padding:14px;
+            border-radius:8px;
+            font-size:22px;
+            font-weight:bold;
+            text-align:center;
+            background-color:#D8ECFE;
+            color:#1B5A43;">
+            {contribution_value_k:.2f} k€
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    st.caption(
+        f"Hypothèses : loan book moyen {loan_book_k:.0f} k€, "
+        f"{cycles_per_month:.1f} cycles / mois."
     )
 
     st.markdown("")
@@ -162,6 +223,9 @@ with right:
             "defaut_30j_pct": defaut_30j_pct,
             "taux_liquidite_annuel_pct": taux_liquidite_annuel_pct,
             "contribution_margin_pct": contribution_margin_pct,
+            "cycles_per_month": cycles_per_month,
+            "loan_book_k": loan_book_k,
+            "contribution_value_k": contribution_value_k,
         }
         st.session_state.scenarios.append(scenario)
         if st.session_state.baseline is None:
@@ -272,7 +336,7 @@ st.markdown("### Évolution dans le temps")
 if st.session_state.scenarios:
     df_scenarios = pd.DataFrame(st.session_state.scenarios).sort_values("date")
 
-    # On garde quelques métriques clés
+    # On garde les métriques de unit economics pour la courbe
     line_df = df_scenarios[
         [
             "date",
