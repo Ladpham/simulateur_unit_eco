@@ -92,7 +92,6 @@ with left:
             help="Affiché aussi en taux annuel."
         )
 
-    # Row 4: Taux de défaut 30j
     row4 = st.columns([0.6, 0.4])
     with row4[0]:
         st.markdown("Taux de défaut 30j / trx")
@@ -106,6 +105,7 @@ with left:
             key="defaut_30j_pct",
             label_visibility="collapsed",
         )
+
 
     # ---------- VARIABLES DE VOLUME ----------
     st.markdown("")
