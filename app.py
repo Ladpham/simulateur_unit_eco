@@ -91,12 +91,7 @@ with left:
             label_visibility="collapsed",
             help="Affiché aussi en taux annuel."
         )
-    # ---------- CALCULS 1 ----------
-    # Coût de liquidité annualisé
-    taux_liquidite_annuel_pct = cout_liquidite_10j_pct * 365 / DUREE_PERIODE_LIQUIDITE_JOURS
 
-    st.caption(f"Coût de liquidité annualisé ≈ **{taux_liquidite_annuel_pct:.1f} %**")
-    
     # Row 4: Taux de défaut 30j
     row4 = st.columns([0.6, 0.4])
     with row4[0]:
@@ -175,7 +170,11 @@ with left:
             key="tx_per_client_per_month",
             label_visibility="collapsed",
         )
-    # ---------- CALCULS 2 ----------
+
+    # ---------- CALCULS ----------
+    # Coût de liquidité annualisé
+    taux_liquidite_annuel_pct = cout_liquidite_10j_pct * 365 / DUREE_PERIODE_LIQUIDITE_JOURS
+
     # Contribution margin (%)
     cout_total_pct = cout_paiement_pct + cout_liquidite_10j_pct + defaut_30j_pct
     contribution_margin_pct = revenu_pct - cout_total_pct
@@ -215,6 +214,8 @@ with left:
         take_rate_effective_pct = monthly_revenue_eur / monthly_volume_eur * 100
     else:
         take_rate_effective_pct = 0.0
+
+    st.caption(f"Coût de liquidité annualisé ≈ **{taux_liquidite_annuel_pct:.1f} %**")
 
 with right:
     st.subheader("Contribution")
