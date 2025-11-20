@@ -52,7 +52,7 @@ with left:
         st.markdown("**Revenus / transaction**")
     with row1[1]:
         revenu_pct = st.number_input(
-            "",
+            label="Revenu par transaction (%)",
             min_value=0.0,
             max_value=100.0,
             value=3.8,
@@ -67,7 +67,7 @@ with left:
         st.markdown("Coût de paiement / trx")
     with row2[1]:
         cout_paiement_pct = st.number_input(
-            " ",
+            label="Coût de paiement (%)",
             min_value=0.0,
             max_value=100.0,
             value=1.8,
@@ -82,7 +82,7 @@ with left:
         st.markdown("Coût de liquidité (10j)")
     with row3[1]:
         cout_liquidite_10j_pct = st.number_input(
-            "  ",
+            label="Coût de liquidité sur 10 jours (%)",
             min_value=0.0,
             max_value=100.0,
             value=0.55,
@@ -98,7 +98,7 @@ with left:
         st.markdown("Taux de défaut 30j / trx")
     with row4[1]:
         defaut_30j_pct = st.number_input(
-            "   ",
+            label="Taux de défaut 30 jours (%)",
             min_value=0.0,
             max_value=100.0,
             value=1.7,
@@ -116,7 +116,7 @@ with left:
         st.markdown("Cycles de liquidité / mois")
     with row5[1]:
         cycles_per_month = st.number_input(
-            "    ",
+            label="Cycles de liquidité par mois",
             min_value=0.0,
             max_value=100.0,
             value=2.9,
@@ -130,7 +130,7 @@ with left:
         st.markdown("Loan book moyen (k€)")
     with row6[1]:
         loan_book_k = st.number_input(
-            "     ",
+            label="Loan book moyen (k€)",
             min_value=0.0,
             max_value=100000.0,
             value=100.0,
@@ -139,7 +139,7 @@ with left:
             label_visibility="collapsed",
         )
 
-    # ---------- NOUVELLES VARIABLES ACTIONNABLES ----------
+    # ---------- HYPOTHÈSES OPÉRATIONNELLES ----------
     st.markdown("")
     st.subheader("Hypothèses opérationnelles")
 
@@ -148,10 +148,10 @@ with left:
         st.markdown("Valeur moyenne par prêt (€)")
     with row7[1]:
         avg_loan_value_eur = st.number_input(
-            "      ",
+            label="Valeur moyenne par prêt (€)",
             min_value=0.0,
             max_value=1_000_000.0,
-            value=500.0,
+            value=300.0,
             step=50.0,
             key="avg_loan_value_eur",
             label_visibility="collapsed",
@@ -162,25 +162,34 @@ with left:
         st.markdown("Transactions par client / mois")
     with row8[1]:
         tx_per_client_per_month = st.number_input(
-            "       ",
+            label="Transactions par client par mois",
             min_value=0.0,
             max_value=1000.0,
-            value=2.0,
+            value=2.9,
             step=0.5,
             key="tx_per_client_per_month",
             label_visibility="collapsed",
         )
 
     # ---------- CALCULS ----------
+    # Coût de liquidité annualisé
     taux_liquidite_annuel_pct = cout_liquidite_10j_pct * 365 / DUREE_PERIODE_LIQUIDITE_JOURS
+
+    # Contribution margin (%)
     cout_total_pct = cout_paiement_pct + cout_liquidite_10j_pct + defaut_30j_pct
     contribution_margin_pct = revenu_pct - cout_total_pct
 
-    # Contribution value par mois en k€
-    contribution_value_k = loan_book_k * cycles_per_month * contribution_margin_pct / 100
-
-    # Volume de prêt mensuel en €
+    # GMV / mois (volume financé)
     monthly_volume_eur = loan_book_k * 1000 * cycles_per_month
+
+    # Revenu / mois (€)
+    monthly_revenue_eur = monthly_volume_eur * (revenu_pct / 100)
+
+    # Revenu / an (€)
+    annual_revenue_eur = monthly_revenue_eur * 12
+
+    # Contribution value / mois (k€)
+    contribution_value_k = loan_book_k * cycles_per_month * contribution_margin_pct / 100
 
     # Nombre de prêts / mois
     if avg_loan_value_eur > 0:
@@ -193,6 +202,18 @@ with left:
         nb_clients_per_month = nb_loans_per_month / tx_per_client_per_month
     else:
         nb_clients_per_month = 0.0
+
+    # Revenu par prêt (€)
+    revenue_per_loan_eur = avg_loan_value_eur * (revenu_pct / 100)
+
+    # Revenu par client / mois (€)
+    revenue_per_client_month_eur = revenue_per_loan_eur * tx_per_client_per_month
+
+    # Take-rate effectif (devrait être = revenu_pct)
+    if monthly_volume_eur > 0:
+        take_rate_effective_pct = monthly_revenue_eur / monthly_volume_eur * 100
+    else:
+        take_rate_effective_pct = 0.0
 
     st.caption(f"Coût de liquidité annualisé ≈ **{taux_liquidite_annuel_pct:.1f} %**")
 
@@ -243,8 +264,86 @@ with right:
         f"{cycles_per_month:.1f} cycles / mois."
     )
 
-    # ---------- MÉTRIQUES ACTIONNABLES ----------
     st.markdown("")
+
+    # ---------- Revenue levels ----------
+    st.subheader("Revenus")
+
+    r1, r2 = st.columns(2)
+    with r1:
+        st.markdown(
+            f"""
+            <div style="
+                border:1px solid #CCCCCC;
+                padding:10px;
+                border-radius:8px;
+                font-size:18px;
+                font-weight:600;
+                text-align:center;">
+                {monthly_revenue_eur:,.0f} €<br/>
+                <span style="font-size:13px;font-weight:400;">Revenue / mois</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with r2:
+        st.markdown(
+            f"""
+            <div style="
+                border:1px solid #CCCCCC;
+                padding:10px;
+                border-radius:8px;
+                font-size:18px;
+                font-weight:600;
+                text-align:center;">
+                {annual_revenue_eur:,.0f} €<br/>
+                <span style="font-size:13px;font-weight:400;">Revenue / an</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    r3, r4 = st.columns(2)
+    with r3:
+        st.markdown(
+            f"""
+            <div style="
+                border:1px solid #CCCCCC;
+                padding:10px;
+                border-radius:8px;
+                font-size:18px;
+                font-weight:600;
+                text-align:center;">
+                {revenue_per_loan_eur:,.0f} €<br/>
+                <span style="font-size:13px;font-weight:400;">Revenue / prêt</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with r4:
+        st.markdown(
+            f"""
+            <div style="
+                border:1px solid #CCCCCC;
+                padding:10px;
+                border-radius:8px;
+                font-size:18px;
+                font-weight:600;
+                text-align:center;">
+                {revenue_per_client_month_eur:,.0f} €<br/>
+                <span style="font-size:13px;font-weight:400;">Revenue / client / mois</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.caption(
+        f"Take-rate effectif ≈ {take_rate_effective_pct:.2f} % sur un volume mensuel de {monthly_volume_eur:,.0f} €."
+    )
+
+    st.markdown("")
+
+    # ---------- MÉTRIQUES ACTIONNABLES ----------
     st.markdown("**Volumes nécessaires / mois**")
 
     m1, m2 = st.columns(2)
@@ -287,26 +386,27 @@ with right:
 
     st.markdown("")
 
-    # ---------- Date + Today ----------
+    # ---------- Date + Today (fix du bug Streamlit) ----------
     date_cols = st.columns([0.7, 0.3])
+
+    # IMPORTANT : on traite d'abord le bouton, puis le date_input.
+    with date_cols[1]:
+        if st.button("Today"):
+            st.session_state["scenario_date"] = date.today()
+
     with date_cols[0]:
         scenario_date = st.date_input(
             "Date",
-            key="scenario_date",          # widget state unique
-            value=st.session_state.scenario_date,
+            value=st.session_state.get("scenario_date", date.today()),
         )
-        # on garde la valeur courante en mémoire
-        st.session_state.scenario_date = scenario_date
-    with date_cols[1]:
-        if st.button("Today"):
-            # on met à jour directement l'état du widget
-            st.session_state.scenario_date = date.today()
+        # On synchronise la valeur choisie avec le state
+        st.session_state["scenario_date"] = scenario_date
 
     scenario_name = st.text_input("Label du scénario", value="Today")
 
     if st.button("SAVE"):
         scenario = {
-            "date": st.session_state.scenario_date,
+            "date": st.session_state["scenario_date"],
             "name": scenario_name,
             "revenu_pct": revenu_pct,
             "cout_paiement_pct": cout_paiement_pct,
@@ -321,11 +421,17 @@ with right:
             "tx_per_client_per_month": tx_per_client_per_month,
             "nb_loans_per_month": nb_loans_per_month,
             "nb_clients_per_month": nb_clients_per_month,
+            "monthly_volume_eur": monthly_volume_eur,
+            "monthly_revenue_eur": monthly_revenue_eur,
+            "annual_revenue_eur": annual_revenue_eur,
+            "revenue_per_loan_eur": revenue_per_loan_eur,
+            "revenue_per_client_month_eur": revenue_per_client_month_eur,
+            "take_rate_effective_pct": take_rate_effective_pct,
         }
         st.session_state.scenarios.append(scenario)
         if st.session_state.baseline is None:
             st.session_state.baseline = scenario
-        st.success(f"Scénario '{scenario_name}' sauvegardé ({st.session_state.scenario_date}).")
+        st.success(f"Scénario '{scenario_name}' sauvegardé ({st.session_state['scenario_date']}).")
 
 st.markdown("---")
 
