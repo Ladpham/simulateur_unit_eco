@@ -28,13 +28,13 @@ if "scenario_date" not in st.session_state:
 # --------------------------------------------------
 page = st.sidebar.radio(
     "Navigation",
-    ["Simulateur", "Comment ça marche ?"]
+    ["Simulateur", "Comment je modélise une courbe ?"]
 )
 
 # ==================================================
 # PAGE 2 : EXPLICATION
 # ==================================================
-if page == "Comment ça marche ?":
+if page == "Comment je modélise une courbe ?":
     st.title("Comment fonctionne le simulateur Waribei ?")
 
     st.markdown("""
@@ -44,89 +44,7 @@ pour obtenir des métriques **business** lisibles pour un investisseur.
 
 ---
 
-### 1. Unit economics (par transaction)
-
-On part de 4 variables exprimées en **% du montant transigé** :
-
-1. **Revenus / transaction (%)**  
-   > part que Waribei prélève sur chaque transaction financée (take-rate brut).
-
-2. **Coût de paiement / transaction (%)**  
-   > frais de rails (Wave, OM, etc.).
-
-3. **Coût de liquidité (10 jours) (%)**  
-   > coût d’accès à la liquidité sur la durée moyenne du prêt (10 jours dans l’exemple).  
-   > Annualisation (indicative) :  
-   \n> `taux_liquidite_annuel = coût_10_jours × 365 / 10`.
-
-4. **Taux de défaut 30j (%)**  
-   > pertes attendues sur le portefeuille à 30 jours.
-
-À partir de là :
-
-- **Total coûts (%)** = paiement + liquidité + défaut  
-- **Contribution margin (%)** = revenus – coûts
-
-C’est **la marge que Waribei garde par euro de GMV**.
-
----
-
-### 2. Variables de volume
-
-Deux niveaux :
-
-#### a) Niveau “financement”
-
-- **Loan book moyen (k€)**  
-  → encours moyen de prêts sur le mois.
-
-- **Cycles de liquidité / mois**  
-  → combien de fois le loan book tourne sur le mois  
-  (ex : `2,9` = chaque euro de loan book est recyclé 2,9 fois dans le mois).
-
-On en déduit :
-
-- **GMV mensuelle (€)**  
-  \n> `GMV_mois = loan_book_k × 1 000 × cycles_par_mois`
-
-- **Revenu mensuel (€)**  
-  \n> `Revenu_mois = GMV_mois × (revenu_% / 100)`
-
-- **Revenu annuel (€)**  
-  \n> `Revenu_an = Revenu_mois × 12`
-
-- **Contribution value / mois (k€)**  
-  \n> `Contribution_mois_k€ = loan_book_k × cycles_par_mois × (contribution_margin_% / 100)`
-
----
-
-#### b) Niveau “opérations terrain”
-
-- **Valeur moyenne par prêt (€)**  
-- **Transactions par client / mois**
-
-À partir de la GMV mensuelle :
-
-- **Nombre de prêts / mois**  
-  \n> `# prêts = GMV_mois / valeur_moyenne_prêt`
-
-- **Nombre de clients / mois**  
-  \n> `# clients = # prêts / transactions_par_client_par_mois`
-
-On peut aussi calculer :
-
-- **Revenu par prêt (€)**  
-  \n> `Revenu_prêt = valeur_moyenne_prêt × (revenu_% / 100)`
-
-- **Revenu par client / mois (€)**  
-  \n> `Revenu_client_mois = Revenu_prêt × transactions_par_client_par_mois`
-
-- **Take-rate effectif (%)**  
-  \n> `take_rate = Revenu_mois / GMV_mois`
-
----
-
-### 3. Scénarios datés
+### 1. Scénarios datés
 
 À droite, tu peux :
 
@@ -147,28 +65,6 @@ Le graphique du bas montre :
 - une **waterfall** (revenu → coûts → marge),
 - une **courbe dans le temps** (évolution des % par date de scénario).
 
----
-
-### 4. Comment l’utiliser en discussion investisseur
-
-1. **Point de départ = “Today”**  
-   → tu montres la photo actuelle.
-
-2. Tu crées des scénarios à des dates clés :
-   - baisse des coûts de paiement,
-   - amélioration du coût de liquidité,
-   - meilleure maîtrise du défaut,
-   - montée du take-rate.
-
-3. Tu montres :
-   - comment la **marge par transaction** évolue,
-   - comment cela se traduit en **€ de contribution**,
-   - quel **volume opérationnel** (prêts / clients par mois) est nécessaire.
-
-En quelques clics, l’investisseur voit :
-- la mécanique **économique**,
-- la mécanique **opérationnelle**,
-- et l’impact de **chaque levier** (paiement, liquidité, défaut, pricing).
 
 """)
 
