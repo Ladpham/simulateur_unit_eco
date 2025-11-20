@@ -139,13 +139,60 @@ with left:
             label_visibility="collapsed",
         )
 
+    # ---------- NOUVELLES VARIABLES ACTIONNABLES ----------
+    st.markdown("")
+    st.subheader("Hypothèses opérationnelles")
+
+    row7 = st.columns([0.6, 0.4])
+    with row7[0]:
+        st.markdown("Valeur moyenne par prêt (€)")
+    with row7[1]:
+        avg_loan_value_eur = st.number_input(
+            "      ",
+            min_value=0.0,
+            max_value=1_000_000.0,
+            value=500.0,
+            step=50.0,
+            key="avg_loan_value_eur",
+            label_visibility="collapsed",
+        )
+
+    row8 = st.columns([0.6, 0.4])
+    with row8[0]:
+        st.markdown("Transactions par client / mois")
+    with row8[1]:
+        tx_per_client_per_month = st.number_input(
+            "       ",
+            min_value=0.0,
+            max_value=1000.0,
+            value=2.0,
+            step=0.5,
+            key="tx_per_client_per_month",
+            label_visibility="collapsed",
+        )
+
     # ---------- CALCULS ----------
     taux_liquidite_annuel_pct = cout_liquidite_10j_pct * 365 / DUREE_PERIODE_LIQUIDITE_JOURS
     cout_total_pct = cout_paiement_pct + cout_liquidite_10j_pct + defaut_30j_pct
     contribution_margin_pct = revenu_pct - cout_total_pct
 
-    # Contribution profit par mois en k€
+    # Contribution value par mois en k€
     contribution_value_k = loan_book_k * cycles_per_month * contribution_margin_pct / 100
+
+    # Volume de prêt mensuel en €
+    monthly_volume_eur = loan_book_k * 1000 * cycles_per_month
+
+    # Nombre de prêts / mois
+    if avg_loan_value_eur > 0:
+        nb_loans_per_month = monthly_volume_eur / avg_loan_value_eur
+    else:
+        nb_loans_per_month = 0.0
+
+    # Nombre de clients / mois
+    if tx_per_client_per_month > 0:
+        nb_clients_per_month = nb_loans_per_month / tx_per_client_per_month
+    else:
+        nb_clients_per_month = 0.0
 
     st.caption(f"Coût de liquidité annualisé ≈ **{taux_liquidite_annuel_pct:.1f} %**")
 
@@ -191,24 +238,68 @@ with right:
         """,
         unsafe_allow_html=True,
     )
-
     st.caption(
         f"Hypothèses : loan book moyen {loan_book_k:.0f} k€, "
         f"{cycles_per_month:.1f} cycles / mois."
     )
 
+    # ---------- MÉTRIQUES ACTIONNABLES ----------
+    st.markdown("")
+    st.markdown("**Volumes nécessaires / mois**")
+
+    m1, m2 = st.columns(2)
+    with m1:
+        st.markdown(
+            f"""
+            <div style="
+                border:1px solid #CCCCCC;
+                padding:10px;
+                border-radius:8px;
+                font-size:18px;
+                font-weight:600;
+                text-align:center;">
+                {nb_loans_per_month:,.0f}<br/>
+                <span style="font-size:13px;font-weight:400;">prêts / mois</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+    with m2:
+        st.markdown(
+            f"""
+            <div style="
+                border:1px solid #CCCCCC;
+                padding:10px;
+                border-radius:8px;
+                font-size:18px;
+                font-weight:600;
+                text-align:center;">
+                {nb_clients_per_month:,.0f}<br/>
+                <span style="font-size:13px;font-weight:400;">clients / mois</span>
+            </div>
+            """,
+            unsafe_allow_html=True,
+        )
+
+    st.caption(
+        f"Basé sur {avg_loan_value_eur:.0f} € par prêt et {tx_per_client_per_month:.1f} transactions / client / mois."
+    )
+
     st.markdown("")
 
-    # Date + Today
+    # ---------- Date + Today ----------
     date_cols = st.columns([0.7, 0.3])
     with date_cols[0]:
-        st.session_state.scenario_date = st.date_input(
+        scenario_date = st.date_input(
             "Date",
+            key="scenario_date",          # widget state unique
             value=st.session_state.scenario_date,
-            key="scenario_date_input"
         )
+        # on garde la valeur courante en mémoire
+        st.session_state.scenario_date = scenario_date
     with date_cols[1]:
         if st.button("Today"):
+            # on met à jour directement l'état du widget
             st.session_state.scenario_date = date.today()
 
     scenario_name = st.text_input("Label du scénario", value="Today")
@@ -226,6 +317,10 @@ with right:
             "cycles_per_month": cycles_per_month,
             "loan_book_k": loan_book_k,
             "contribution_value_k": contribution_value_k,
+            "avg_loan_value_eur": avg_loan_value_eur,
+            "tx_per_client_per_month": tx_per_client_per_month,
+            "nb_loans_per_month": nb_loans_per_month,
+            "nb_clients_per_month": nb_clients_per_month,
         }
         st.session_state.scenarios.append(scenario)
         if st.session_state.baseline is None:
