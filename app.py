@@ -1,59 +1,11 @@
-import matplotlib.pyplot as plt
-
-def waterfall_chart(revenue, pay_cost, liq_cost, default_cost, margin):
-    fig, ax = plt.subplots(figsize=(7, 4))
-
-    labels = [
-        "Revenu",
-        "Coût paiement",
-        "Coût liquidité",
-        "Défaut 30j",
-        "Contribution"
-    ]
-    values = [
-        revenue,
-        -pay_cost,
-        -liq_cost,
-        -default_cost,
-        margin
-    ]
-
-    cumulative = [0]
-    for v in values[:-1]:
-        cumulative.append(cumulative[-1] + v)
-
-    colors = [
-        "#1B5A43",   # green-ish for revenue
-        "#F83131",   # red for costs
-        "#F83131",
-        "#F83131",
-        "#064C72",   # blue for final margin
-    ]
-
-    for i, (label, value, start) in enumerate(zip(labels, values, cumulative)):
-        ax.bar(label, value, bottom=start, color=colors[i])
-
-        ax.text(
-            i,
-            start + value / 2,
-            f"{value:.2f}%",
-            ha='center',
-            va='center',
-            color='white',
-            fontsize=9
-        )
-
-    ax.set_ylabel("%")
-    ax.set_title("Décomposition par transaction (Waterfall)")
-    ax.spines["top"].set_visible(False)
-    ax.spines["right"].set_visible(False)
-    return fig
-
 import streamlit as st
 import pandas as pd
+import altair as alt
 from datetime import date
-import plotly.graph_objects as go
 
+# --------------------------------------------------
+# CONFIG
+# --------------------------------------------------
 st.set_page_config(
     page_title="Waribei – Unit Economics",
     layout="wide"
@@ -61,7 +13,9 @@ st.set_page_config(
 
 DUREE_PERIODE_LIQUIDITE_JOURS = 10
 
-# ---------- STATE ----------
+# --------------------------------------------------
+# SESSION STATE
+# --------------------------------------------------
 if "scenarios" not in st.session_state:
     st.session_state.scenarios = []
 if "baseline" not in st.session_state:
@@ -69,7 +23,9 @@ if "baseline" not in st.session_state:
 if "scenario_date" not in st.session_state:
     st.session_state.scenario_date = date.today()
 
-# ---------- HEADER ----------
+# --------------------------------------------------
+# HEADER
+# --------------------------------------------------
 top = st.columns([0.7, 0.3])
 with top[0]:
     st.title("Unit Economics – Waribei")
@@ -78,11 +34,13 @@ with top[1]:
     try:
         st.image("logo_waribei_icon@2x.png", width=100)
     except Exception:
-        st.write("Logo Waribei (ajoute logo_waribei_icon@2x.png)")
+        st.write("Logo Waribei (ajoute `logo_waribei_icon@2x.png`)")
 
 st.markdown("---")
 
-# ---------- MAIN ZONE ----------
+# --------------------------------------------------
+# MAIN ZONE
+# --------------------------------------------------
 left, right = st.columns([0.6, 0.4])
 
 with left:
@@ -160,7 +118,7 @@ with right:
     st.subheader("Contribution")
 
     st.markdown("Contribution margin / trx")
-    # Gros cadre pour la margin, couleur Waribei
+    # Gros cadre pour la margin, couleurs Waribei
     st.markdown(
         f"""
         <div style="
@@ -183,10 +141,10 @@ with right:
     # Date + Today
     date_cols = st.columns([0.7, 0.3])
     with date_cols[0]:
-        scenario_date = st.date_input(
+        st.session_state.scenario_date = st.date_input(
             "Date",
             value=st.session_state.scenario_date,
-            key="scenario_date"
+            key="scenario_date_input"
         )
     with date_cols[1]:
         if st.button("Today"):
@@ -212,10 +170,62 @@ with right:
 
 st.markdown("---")
 
-# ---------- WATERFALL CHART ----------
+# --------------------------------------------------
+# WATERFALL DATA PREP (Revenu -> coûts -> Margin)
+# --------------------------------------------------
+def make_waterfall_df(revenue, pay_cost, liq_cost, default_cost, margin):
+    steps = [
+        "Revenu",
+        "Coût paiement",
+        "Coût liquidité (10j)",
+        "Défaut 30j",
+        "Contribution"
+    ]
+    values = [
+        revenue,
+        -pay_cost,
+        -liq_cost,
+        -default_cost,
+        margin
+    ]
+
+    start = []
+    end = []
+    running = 0.0
+    for v in values[:-1]:
+        start.append(running)
+        running += v
+        end.append(running)
+
+    # Dernier step = total: de 0 à margin
+    start.append(0.0)
+    end.append(margin)
+
+    types = []
+    for i, v in enumerate(values):
+        if i == len(values) - 1:
+            types.append("total")
+        elif v >= 0:
+            types.append("positive")
+        else:
+            types.append("negative")
+
+    return pd.DataFrame(
+        {
+            "step": steps,
+            "value": values,
+            "start": start,
+            "end": end,
+            "type": types,
+        }
+    )
+
+# --------------------------------------------------
+# WATERFALL CHART (Altair, no zoom)
+# --------------------------------------------------
 st.markdown("### Décomposition par transaction (waterfall)")
 
-fig = waterfall_chart(
+wf_df = make_waterfall_df(
     revenu_pct,
     cout_paiement_pct,
     cout_liquidite_10j_pct,
@@ -223,26 +233,84 @@ fig = waterfall_chart(
     contribution_margin_pct
 )
 
-st.pyplot(fig, use_container_width=True)
+color_scale = alt.Scale(
+    domain=["positive", "negative", "total"],
+    range=["#1B5A43", "#F83131", "#064C72"],
+)
 
+waterfall_chart = (
+    alt.Chart(wf_df)
+    .mark_bar()
+    .encode(
+        x=alt.X("step:N", title=None, sort=list(wf_df["step"])),
+        y=alt.Y("start:Q", axis=alt.Axis(title="%")),
+        y2="end:Q",
+        color=alt.Color("type:N", scale=color_scale, legend=None),
+    )
+)
 
-# ---------- TIME SERIES ----------
+labels = (
+    alt.Chart(wf_df)
+    .mark_text(dy=-6, color="#333", fontSize=11)
+    .encode(
+        x=alt.X("step:N", sort=list(wf_df["step"])),
+        y="end:Q",
+        text=alt.Text("value:Q", format=".2f"),
+    )
+)
+
+st.altair_chart(
+    (waterfall_chart + labels).properties(height=260),
+    use_container_width=True,
+)
+
+# --------------------------------------------------
+# TIME SERIES CHART (Altair, no zoom)
+# --------------------------------------------------
 st.markdown("### Évolution dans le temps")
 
 if st.session_state.scenarios:
     df_scenarios = pd.DataFrame(st.session_state.scenarios).sort_values("date")
 
-    line_df = df_scenarios.set_index("date")[
+    # On garde quelques métriques clés
+    line_df = df_scenarios[
         [
+            "date",
             "revenu_pct",
             "cout_paiement_pct",
             "cout_liquidite_10j_pct",
             "defaut_30j_pct",
             "contribution_margin_pct",
         ]
-    ]
-    st.line_chart(line_df)
+    ].melt(id_vars="date", var_name="metric", value_name="value")
 
+    metric_order = [
+        "revenu_pct",
+        "cout_paiement_pct",
+        "cout_liquidite_10j_pct",
+        "defaut_30j_pct",
+        "contribution_margin_pct",
+    ]
+
+    color_line = alt.Scale(
+        domain=metric_order,
+        range=["#1B5A43", "#F83131", "#8ECAE6", "#FFC444", "#064C72"],
+    )
+
+    line_chart = (
+        alt.Chart(line_df)
+        .mark_line(point=True)
+        .encode(
+            x=alt.X("date:T", title="Date"),
+            y=alt.Y("value:Q", title="%"),
+            color=alt.Color("metric:N", scale=color_line, title="Métrique"),
+        )
+        .properties(height=260)
+    )
+
+    st.altair_chart(line_chart, use_container_width=True)
+
+    # Scénarios list + delete
     st.markdown("#### Scénarios enregistrés")
     st.dataframe(df_scenarios, use_container_width=True)
 
