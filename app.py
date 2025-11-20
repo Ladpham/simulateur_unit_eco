@@ -1,3 +1,54 @@
+import matplotlib.pyplot as plt
+
+def waterfall_chart(revenue, pay_cost, liq_cost, default_cost, margin):
+    fig, ax = plt.subplots(figsize=(7, 4))
+
+    labels = [
+        "Revenu",
+        "Coût paiement",
+        "Coût liquidité",
+        "Défaut 30j",
+        "Contribution"
+    ]
+    values = [
+        revenue,
+        -pay_cost,
+        -liq_cost,
+        -default_cost,
+        margin
+    ]
+
+    cumulative = [0]
+    for v in values[:-1]:
+        cumulative.append(cumulative[-1] + v)
+
+    colors = [
+        "#1B5A43",   # green-ish for revenue
+        "#F83131",   # red for costs
+        "#F83131",
+        "#F83131",
+        "#064C72",   # blue for final margin
+    ]
+
+    for i, (label, value, start) in enumerate(zip(labels, values, cumulative)):
+        ax.bar(label, value, bottom=start, color=colors[i])
+
+        ax.text(
+            i,
+            start + value / 2,
+            f"{value:.2f}%",
+            ha='center',
+            va='center',
+            color='white',
+            fontsize=9
+        )
+
+    ax.set_ylabel("%")
+    ax.set_title("Décomposition par transaction (Waterfall)")
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    return fig
+
 import streamlit as st
 import pandas as pd
 from datetime import date
@@ -164,46 +215,16 @@ st.markdown("---")
 # ---------- WATERFALL CHART ----------
 st.markdown("### Décomposition par transaction (waterfall)")
 
-waterfall_fig = go.Figure(
-    go.Waterfall(
-        name="Unit Economics",
-        orientation="v",
-        x=[
-            "Revenu",
-            "Coût paiement",
-            "Coût liquidité (10j)",
-            "Pertes (30j)",
-            "Contribution margin",
-        ],
-        measure=["relative", "relative", "relative", "relative", "total"],
-        y=[
-            revenu_pct,
-            -cout_paiement_pct,
-            -cout_liquidite_10j_pct,
-            -defaut_30j_pct,
-            contribution_margin_pct,
-        ],
-        text=[f"{v:.2f} %" for v in [
-            revenu_pct,
-            -cout_paiement_pct,
-            -cout_liquidite_10j_pct,
-            -defaut_30j_pct,
-            contribution_margin_pct,
-        ]],
-        textposition="outside",
-        connector={"line": {"color": "#8ECAE6"}},
-        increasing={"marker": {"color": "#1B5A43"}},
-        decreasing={"marker": {"color": "#F83131"}},
-        totals={"marker": {"color": "#064C72"}},
-    )
+fig = waterfall_chart(
+    revenu_pct,
+    cout_paiement_pct,
+    cout_liquidite_10j_pct,
+    defaut_30j_pct,
+    contribution_margin_pct
 )
 
-waterfall_fig.update_layout(
-    showlegend=False,
-    yaxis_title="%",
-    margin=dict(l=20, r=20, t=20, b=20),
-)
-st.plotly_chart(waterfall_fig, use_container_width=True)
+st.pyplot(fig, use_container_width=True)
+
 
 # ---------- TIME SERIES ----------
 st.markdown("### Évolution dans le temps")
