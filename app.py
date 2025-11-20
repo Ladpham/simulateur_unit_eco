@@ -91,51 +91,12 @@ with left:
             label_visibility="collapsed",
             help="Affiché aussi en taux annuel."
         )
-    # ---------- CALCULS ----------
+    # ---------- CALCULS 1 ----------
     # Coût de liquidité annualisé
     taux_liquidite_annuel_pct = cout_liquidite_10j_pct * 365 / DUREE_PERIODE_LIQUIDITE_JOURS
 
-    # Contribution margin (%)
-    cout_total_pct = cout_paiement_pct + cout_liquidite_10j_pct + defaut_30j_pct
-    contribution_margin_pct = revenu_pct - cout_total_pct
-
-    # GMV / mois (volume financé)
-    monthly_volume_eur = loan_book_k * 1000 * cycles_per_month
-
-    # Revenu / mois (€)
-    monthly_revenue_eur = monthly_volume_eur * (revenu_pct / 100)
-
-    # Revenu / an (€)
-    annual_revenue_eur = monthly_revenue_eur * 12
-
-    # Contribution value / mois (k€)
-    contribution_value_k = loan_book_k * cycles_per_month * contribution_margin_pct / 100
-
-    # Nombre de prêts / mois
-    if avg_loan_value_eur > 0:
-        nb_loans_per_month = monthly_volume_eur / avg_loan_value_eur
-    else:
-        nb_loans_per_month = 0.0
-
-    # Nombre de clients / mois
-    if tx_per_client_per_month > 0:
-        nb_clients_per_month = nb_loans_per_month / tx_per_client_per_month
-    else:
-        nb_clients_per_month = 0.0
-
-    # Revenu par prêt (€)
-    revenue_per_loan_eur = avg_loan_value_eur * (revenu_pct / 100)
-
-    # Revenu par client / mois (€)
-    revenue_per_client_month_eur = revenue_per_loan_eur * tx_per_client_per_month
-
-    # Take-rate effectif (devrait être = revenu_pct)
-    if monthly_volume_eur > 0:
-        take_rate_effective_pct = monthly_revenue_eur / monthly_volume_eur * 100
-    else:
-        take_rate_effective_pct = 0.0
-
     st.caption(f"Coût de liquidité annualisé ≈ **{taux_liquidite_annuel_pct:.1f} %**")
+    
     # Row 4: Taux de défaut 30j
     row4 = st.columns([0.6, 0.4])
     with row4[0]:
@@ -214,7 +175,46 @@ with left:
             key="tx_per_client_per_month",
             label_visibility="collapsed",
         )
+    # ---------- CALCULS 2 ----------
+    # Contribution margin (%)
+    cout_total_pct = cout_paiement_pct + cout_liquidite_10j_pct + defaut_30j_pct
+    contribution_margin_pct = revenu_pct - cout_total_pct
 
+    # GMV / mois (volume financé)
+    monthly_volume_eur = loan_book_k * 1000 * cycles_per_month
+
+    # Revenu / mois (€)
+    monthly_revenue_eur = monthly_volume_eur * (revenu_pct / 100)
+
+    # Revenu / an (€)
+    annual_revenue_eur = monthly_revenue_eur * 12
+
+    # Contribution value / mois (k€)
+    contribution_value_k = loan_book_k * cycles_per_month * contribution_margin_pct / 100
+
+    # Nombre de prêts / mois
+    if avg_loan_value_eur > 0:
+        nb_loans_per_month = monthly_volume_eur / avg_loan_value_eur
+    else:
+        nb_loans_per_month = 0.0
+
+    # Nombre de clients / mois
+    if tx_per_client_per_month > 0:
+        nb_clients_per_month = nb_loans_per_month / tx_per_client_per_month
+    else:
+        nb_clients_per_month = 0.0
+
+    # Revenu par prêt (€)
+    revenue_per_loan_eur = avg_loan_value_eur * (revenu_pct / 100)
+
+    # Revenu par client / mois (€)
+    revenue_per_client_month_eur = revenue_per_loan_eur * tx_per_client_per_month
+
+    # Take-rate effectif (devrait être = revenu_pct)
+    if monthly_volume_eur > 0:
+        take_rate_effective_pct = monthly_revenue_eur / monthly_volume_eur * 100
+    else:
+        take_rate_effective_pct = 0.0
 
 with right:
     st.subheader("Contribution")
