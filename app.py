@@ -95,6 +95,70 @@ else:
     with left:
         st.subheader("Hypothèses par transaction")
 
+        # ---------- SCÉNARIOS RAPIDES ----------
+        st.markdown("#### Scénarios rapides")
+
+        scenario = st.selectbox(
+            "Choisir un scénario",
+            [
+                "Custom",
+                "Aujourd'hui",
+                "Open Banking",
+                "Supplier funding",
+                "OB + Supplier (défaut bon 0,8%)",
+                "OB + Supplier (défaut moyen 1,2%)",
+                "OB + Supplier (défaut mauvais 2,0%)",
+            ],
+        )
+
+        # Initialisation des valeurs par défaut dans le state (si pas déjà présentes)
+        if "revenu_pct" not in st.session_state:
+            st.session_state["revenu_pct"] = 3.8
+        if "cout_paiement_pct" not in st.session_state:
+            st.session_state["cout_paiement_pct"] = 1.8
+        if "cout_liquidite_10j_pct" not in st.session_state:
+            st.session_state["cout_liquidite_10j_pct"] = 0.55
+        if "defaut_30j_pct" not in st.session_state:
+            st.session_state["defaut_30j_pct"] = 1.7
+
+        # Application des scénarios AVANT les inputs
+        if scenario == "Aujourd'hui":
+            st.session_state["revenu_pct"] = 3.8
+            st.session_state["cout_paiement_pct"] = 1.8
+            st.session_state["cout_liquidite_10j_pct"] = 0.55
+            st.session_state["defaut_30j_pct"] = 1.7
+
+        elif scenario == "Open Banking":
+            st.session_state["cout_paiement_pct"] = 0.5
+            # on laisse liquidité et défaut comme dans l'état courant
+
+        elif scenario == "Supplier funding":
+            # coût de liquidité effectif réduit (10 % du niveau actuel)
+            st.session_state["cout_liquidite_10j_pct"] = 0.055
+
+        elif scenario == "OB + Supplier (défaut bon 0,8%)":
+            st.session_state["cout_paiement_pct"] = 0.5
+            st.session_state["cout_liquidite_10j_pct"] = 0.055
+            st.session_state["defaut_30j_pct"] = 0.8
+
+        elif scenario == "OB + Supplier (défaut moyen 1,2%)":
+            st.session_state["cout_paiement_pct"] = 0.5
+            st.session_state["cout_liquidite_10j_pct"] = 0.055
+            st.session_state["defaut_30j_pct"] = 1.2
+
+        elif scenario == "OB + Supplier (défaut mauvais 2,0%)":
+            st.session_state["cout_paiement_pct"] = 0.5
+            st.session_state["cout_liquidite_10j_pct"] = 0.055
+            st.session_state["defaut_30j_pct"] = 2.0
+
+        # Si "Custom", on ne force rien : l'utilisateur ajuste à la main
+
+        st.markdown("---")
+
+
+    with left:
+        st.subheader("Hypothèses par transaction")
+
         # Row 1: Revenu / trx
         row1 = st.columns([0.6, 0.4])
         with row1[0]:
