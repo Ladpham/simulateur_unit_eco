@@ -37,6 +37,8 @@ PRESETS_BY_DATE = {
 }
 DEFAULT_DATE = date(2026, 6, 1)
 
+HISTORY_DATES = [date(2025, 6, 1), date(2025, 12, 1), date(2026, 6, 1)]
+
 # --------------------------------------------------
 # SESSION STATE
 # --------------------------------------------------
@@ -78,21 +80,20 @@ def apply_preset_for_date(d: date, force: bool = False):
     st.session_state.last_loaded_date = d
 
 
-# Seed historique (une seule fois)
+# Seed historique (uniquement les dates demandées)
 if "seeded_history" not in st.session_state:
     st.session_state.seeded_history = False
 
 if not st.session_state.seeded_history:
-    for d in [date(2025, 6, 1), date(2025, 12, 1)]:
+    for d in HISTORY_DATES:
         p = PRESETS_BY_DATE[d]
+        # on stocke aussi contribution_margin_pct pour simplifier la courbe
+        cm = p["revenu_pct"] - (p["cout_paiement_pct"] + p["cout_liquidite_10j_pct"] + p["defaut_30j_pct"])
         st.session_state.scenarios.append(
             {
                 "date": d,
                 "name": p["name"],
-                "revenu_pct": p["revenu_pct"],
-                "cout_paiement_pct": p["cout_paiement_pct"],
-                "cout_liquidite_10j_pct": p["cout_liquidite_10j_pct"],
-                "defaut_30j_pct": p["defaut_30j_pct"],
+                "contribution_margin_pct": cm,
             }
         )
     st.session_state.seeded_history = True
@@ -100,7 +101,7 @@ if not st.session_state.seeded_history:
 apply_preset_for_date(st.session_state.scenario_date, force=False)
 
 # --------------------------------------------------
-# GLOBAL CSS (look & feel)
+# GLOBAL CSS
 # --------------------------------------------------
 st.markdown(
     """
@@ -108,7 +109,6 @@ st.markdown(
 div.block-container { padding-top: 1.2rem; }
 h1, h2, h3 { letter-spacing: -0.02em; }
 
-/* Card */
 .wb-card {
   border: 1px solid rgba(0,0,0,0.10);
   border-radius: 14px;
@@ -116,7 +116,7 @@ h1, h2, h3 { letter-spacing: -0.02em; }
   background: rgba(255,255,255,0.70);
 }
 
-/* Vertical bar visual */
+/* Vertical bar */
 .vbar-wrap { display:flex; align-items:center; gap:12px; }
 .vbar {
   height: 168px;
@@ -134,20 +134,13 @@ h1, h2, h3 { letter-spacing: -0.02em; }
   width:100%;
   border-radius: 14px;
 }
-.vbar-metric {
-  display:flex;
-  flex-direction:column;
-  gap:2px;
-}
+.vbar-metric { display:flex; flex-direction:column; gap:2px; }
 .vbar-metric .big { font-size: 22px; font-weight: 800; line-height: 1; }
 .vbar-metric .sub { font-size: 12px; opacity: 0.7; }
 
 /* Simple knob like sketch */
 .knob-wrap { display:flex; align-items:center; gap:12px; }
-.knob-shell {
-  width: 110px; height: 110px;
-  position: relative;
-}
+.knob-shell { width: 110px; height: 110px; position: relative; }
 .knob-ring {
   width: 90px; height: 90px;
   border-radius: 50%;
@@ -182,15 +175,7 @@ def _clamp(x, lo, hi):
     return max(lo, min(hi, x))
 
 
-def vbar_widget(
-    label: str,
-    key: str,
-    vmin: float,
-    vmax: float,
-    step: float,
-    help_txt: str,
-    color_mode: str,
-):
+def vbar_widget(label: str, key: str, vmin: float, vmax: float, step: float, help_txt: str, color_mode: str):
     """
     Barre verticale VISUELLE + slider Streamlit.
     color_mode:
@@ -204,7 +189,6 @@ def vbar_widget(
     pct = 0 if vmax == vmin else (val - vmin) / (vmax - vmin)
     pct = _clamp(pct, 0, 1)
 
-    # ✅ Couleurs corrigées
     if color_mode == "rev":
         # bottom red -> top green
         grad = "linear-gradient(180deg, rgba(34,197,94,0.95), rgba(239,68,68,0.95))"
@@ -227,8 +211,6 @@ def vbar_widget(
         """,
         unsafe_allow_html=True,
     )
-
-    # Limitation Streamlit: pas de drag direct dans la barre sans composant custom.
     st.slider(
         label="",
         min_value=float(vmin),
@@ -242,14 +224,9 @@ def vbar_widget(
 
 
 def knob_simple_visual(label: str, value: float, vmin: float, vmax: float, value_fmt: str = "{:,.0f}"):
-    """
-    Visuel très simple comme le croquis: anneau + ticks + aiguille.
-    (Rotation basée sur 270° de course.)
-    """
     pct = 0 if vmax == vmin else (value - vmin) / (vmax - vmin)
     pct = _clamp(pct, 0, 1)
-    # course -135° à +135°
-    deg = -135 + pct * 270
+    deg = -135 + pct * 270  # -135° à +135°
 
     st.markdown(f"**{label}**")
     st.markdown(
@@ -282,9 +259,8 @@ if page == "Comment je modélise une courbe ?":
     st.title("Comment fonctionne le simulateur Waribei ?")
     st.markdown(
         """
-- Historique préchargé : **Jun 2025** et **Dec 2025**
-- Par défaut : **Jun 2026** avec tes valeurs target
-- Si tu changes la date vers une date “preset”, les valeurs se repositionnent automatiquement.
+- Historique: **Jun 2025**, **Dec 2025**, **Jun 2026**
+- Courbe "Évolution dans le temps" : uniquement **contribution_margin_pct**
 """
     )
 
@@ -306,7 +282,7 @@ else:
     main_left, main_right = st.columns([0.68, 0.32], gap="large")
 
     # =========================
-    # LEFT: Hypothèses par transaction + Volumes + Opérationnel
+    # LEFT: Hypothèses par transaction + Volume + Opérationnel
     # =========================
     with main_left:
         # ---- Hypothèses par transaction
@@ -315,45 +291,13 @@ else:
 
         c1, c2, c3, c4 = st.columns(4, gap="large")
         with c1:
-            vbar_widget(
-                "Revenus / trx",
-                key="revenu_pct",
-                vmin=1.0,
-                vmax=5.0,
-                step=0.01,
-                help_txt="Take-rate / commission moyenne.",
-                color_mode="rev",
-            )
+            vbar_widget("Revenus / trx", "revenu_pct", 1.0, 5.0, 0.01, "Take-rate / commission moyenne.", "rev")
         with c2:
-            vbar_widget(
-                "Coût paiement / trx",
-                key="cout_paiement_pct",
-                vmin=0.0,
-                vmax=2.0,
-                step=0.01,
-                help_txt="Coût des rails de paiement.",
-                color_mode="cost",
-            )
+            vbar_widget("Coût paiement / trx", "cout_paiement_pct", 0.0, 2.0, 0.01, "Coût des rails de paiement.", "cost")
         with c3:
-            vbar_widget(
-                "Coût liquidité (10j)",
-                key="cout_liquidite_10j_pct",
-                vmin=0.0,
-                vmax=1.5,
-                step=0.01,
-                help_txt="Coût de financement sur 10 jours.",
-                color_mode="cost",
-            )
+            vbar_widget("Coût liquidité (10j)", "cout_liquidite_10j_pct", 0.0, 1.5, 0.01, "Coût de financement sur 10 jours.", "cost")
         with c4:
-            vbar_widget(
-                "Défaut 30j / trx",
-                key="defaut_30j_pct",
-                vmin=0.0,
-                vmax=5.0,
-                step=0.01,
-                help_txt="Perte attendue (net) à 30 jours.",
-                color_mode="cost",
-            )
+            vbar_widget("Défaut 30j / trx", "defaut_30j_pct", 0.0, 5.0, 0.01, "Perte attendue (net) à 30 jours.", "cost")
 
         st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("")
@@ -365,12 +309,13 @@ else:
         vcol1, vcol2 = st.columns([0.58, 0.42], gap="large")
         with vcol1:
             knob_simple_visual("Loan book moyen (k€)", float(st.session_state["loan_book_k"]), 50.0, 1000.0)
-            st.number_input(
+            # ✅ Slider en dessous de la molette
+            st.slider(
                 label="",
                 min_value=50.0,
                 max_value=1000.0,
-                step=10.0,
                 value=float(st.session_state["loan_book_k"]),
+                step=10.0,
                 key="loan_book_k",
                 label_visibility="collapsed",
             )
@@ -390,30 +335,35 @@ else:
         st.markdown("</div>", unsafe_allow_html=True)
         st.markdown("")
 
-        # ---- Hypothèses opérationnelles (✅ remis)
+        # ---- Hypothèses opérationnelles
         st.markdown('<div class="wb-card">', unsafe_allow_html=True)
         st.subheader("Hypothèses opérationnelles")
 
         o1, o2 = st.columns(2, gap="large")
+
         with o1:
             knob_simple_visual("Valeur moyenne par prêt (€)", float(st.session_state["avg_loan_value_eur"]), 150.0, 1000.0)
-            st.number_input(
+            # ✅ Slider en dessous de la molette
+            st.slider(
                 label="",
                 min_value=150.0,
                 max_value=1000.0,
-                step=50.0,
                 value=float(st.session_state["avg_loan_value_eur"]),
+                step=50.0,
                 key="avg_loan_value_eur",
                 label_visibility="collapsed",
             )
+
         with o2:
-            knob_simple_visual("Transactions / client / mois", float(st.session_state["tx_per_client_per_month"]), 1.0, 12.0, value_fmt="{:,.1f}")
-            st.number_input(
+            st.markdown("**Transactions / client / mois**")
+            st.caption("1 → 12")
+            # ✅ Slider horizontal (comme cycles)
+            st.slider(
                 label="",
                 min_value=1.0,
                 max_value=12.0,
-                step=0.5,
                 value=float(st.session_state["tx_per_client_per_month"]),
+                step=0.5,
                 key="tx_per_client_per_month",
                 label_visibility="collapsed",
             )
@@ -558,40 +508,28 @@ else:
         scenario_name = st.text_input("Label du scénario", value=default_label)
 
         if st.button("SAVE"):
-            scenario_obj = {
-                "date": st.session_state["scenario_date"],
-                "name": scenario_name,
-                "revenu_pct": float(st.session_state["revenu_pct"]),
-                "cout_paiement_pct": float(st.session_state["cout_paiement_pct"]),
-                "cout_liquidite_10j_pct": float(st.session_state["cout_liquidite_10j_pct"]),
-                "defaut_30j_pct": float(st.session_state["defaut_30j_pct"]),
-                "taux_liquidite_annuel_pct": taux_liquidite_annuel_pct,
-                "contribution_margin_pct": contribution_margin_pct,
-                "cycles_per_month": cycles_per_month,
-                "loan_book_k": loan_book_k,
-                "contribution_value_k": contribution_value_k,
-                "avg_loan_value_eur": avg_loan_value_eur,
-                "tx_per_client_per_month": tx_per_client_per_month,
-                "nb_loans_per_month": nb_loans_per_month,
-                "nb_clients_per_month": nb_clients_per_month,
-                "monthly_volume_eur": monthly_volume_eur,
-                "monthly_revenue_eur": monthly_revenue_eur,
-                "annual_revenue_eur": annual_revenue_eur,
-                "revenue_per_loan_eur": revenue_per_loan_eur,
-                "revenue_per_client_month_eur": revenue_per_client_month_eur,
-                "take_rate_effective_pct": take_rate_effective_pct,
-            }
-            st.session_state.scenarios.append(scenario_obj)
-            if st.session_state.baseline is None:
-                st.session_state.baseline = scenario_obj
-            st.success(f"Scénario '{scenario_name}' sauvegardé ({st.session_state['scenario_date']}).")
+            # On met à jour (ou crée) le point Jun 2026 pour la courbe contribution_margin_pct
+            d = st.session_state["scenario_date"]
+            cm_now = contribution_margin_pct
+
+            # on remplace si date déjà présente, sinon on ajoute
+            replaced = False
+            for i, s in enumerate(st.session_state.scenarios):
+                if s.get("date") == d:
+                    st.session_state.scenarios[i] = {"date": d, "name": scenario_name, "contribution_margin_pct": cm_now}
+                    replaced = True
+                    break
+            if not replaced:
+                st.session_state.scenarios.append({"date": d, "name": scenario_name, "contribution_margin_pct": cm_now})
+
+            st.success(f"Scénario '{scenario_name}' sauvegardé ({d}).")
 
         st.markdown("</div>", unsafe_allow_html=True)
 
     st.markdown("---")
 
     # --------------------------------------------------
-    # WATERFALL
+    # WATERFALL (inchangé)
     # --------------------------------------------------
     def make_waterfall_df(revenue, pay_cost, liq_cost, default_cost, margin):
         steps = ["Revenu", "Coût paiement", "Coût liquidité (10j)", "Défaut 30j", "Contribution"]
@@ -618,18 +556,13 @@ else:
 
         return pd.DataFrame({"step": steps, "value": values, "start": start, "end": end, "type": types})
 
-
     st.markdown("### Décomposition par transaction (waterfall)")
     wf_df = make_waterfall_df(
-        float(st.session_state["revenu_pct"]),
-        float(st.session_state["cout_paiement_pct"]),
-        float(st.session_state["cout_liquidite_10j_pct"]),
-        float(st.session_state["defaut_30j_pct"]),
-        float(st.session_state["revenu_pct"]) - (
-            float(st.session_state["cout_paiement_pct"])
-            + float(st.session_state["cout_liquidite_10j_pct"])
-            + float(st.session_state["defaut_30j_pct"])
-        ),
+        revenu_pct,
+        cout_paiement_pct,
+        cout_liquidite_10j_pct,
+        defaut_30j_pct,
+        contribution_margin_pct,
     )
 
     color_scale = alt.Scale(domain=["positive", "negative", "total"], range=["#1B5A43", "#F83131", "#064C72"])
@@ -655,60 +588,28 @@ else:
     st.altair_chart((waterfall_chart + wf_labels).properties(height=260), use_container_width=True)
 
     # --------------------------------------------------
-    # TIME SERIES
+    # TIME SERIES: seulement contribution_margin_pct (3 dates)
     # --------------------------------------------------
-    st.markdown("### Évolution dans le temps")
+    st.markdown("### Évolution dans le temps (Contribution margin uniquement)")
 
-    if st.session_state.scenarios:
-        df_scenarios = pd.DataFrame(st.session_state.scenarios).sort_values("date")
+    df_hist = pd.DataFrame(st.session_state.scenarios)
 
-        if "contribution_margin_pct" not in df_scenarios.columns:
-            df_scenarios["contribution_margin_pct"] = (
-                df_scenarios["revenu_pct"]
-                - (df_scenarios["cout_paiement_pct"] + df_scenarios["cout_liquidite_10j_pct"] + df_scenarios["defaut_30j_pct"])
-            )
-        else:
-            mask = df_scenarios["contribution_margin_pct"].isna()
-            if mask.any():
-                df_scenarios.loc[mask, "contribution_margin_pct"] = (
-                    df_scenarios.loc[mask, "revenu_pct"]
-                    - (
-                        df_scenarios.loc[mask, "cout_paiement_pct"]
-                        + df_scenarios.loc[mask, "cout_liquidite_10j_pct"]
-                        + df_scenarios.loc[mask, "defaut_30j_pct"]
-                    )
-                )
+    # Garde uniquement les 3 dates demandées (si Jun 2026 a été modifié via SAVE, il sera mis à jour)
+    df_hist = df_hist[df_hist["date"].isin(HISTORY_DATES)].sort_values("date")
 
-        line_df = df_scenarios[
-            ["date", "revenu_pct", "cout_paiement_pct", "cout_liquidite_10j_pct", "defaut_30j_pct", "contribution_margin_pct"]
-        ].melt(id_vars="date", var_name="metric", value_name="value")
+    # Sécurité: si doublons, on garde la dernière occurrence
+    df_hist = df_hist.drop_duplicates(subset=["date"], keep="last")
 
-        metric_order = ["revenu_pct", "cout_paiement_pct", "cout_liquidite_10j_pct", "defaut_30j_pct", "contribution_margin_pct"]
-        color_line = alt.Scale(domain=metric_order, range=["#1B5A43", "#F83131", "#8ECAE6", "#FFC444", "#064C72"])
-
-        line_chart = (
-            alt.Chart(line_df)
-            .mark_line(point=True)
-            .encode(
-                x=alt.X("date:T", title="Date"),
-                y=alt.Y("value:Q", title="%"),
-                color=alt.Color("metric:N", scale=color_line, title="Métrique"),
-            )
-            .properties(height=260)
+    line_chart = (
+        alt.Chart(df_hist)
+        .mark_line(point=True)
+        .encode(
+            x=alt.X("date:T", title="Date"),
+            y=alt.Y("contribution_margin_pct:Q", title="%"),
+            tooltip=[alt.Tooltip("date:T", title="Date"), alt.Tooltip("contribution_margin_pct:Q", title="Contribution (%)", format=".2f")],
         )
-        st.altair_chart(line_chart, use_container_width=True)
+        .properties(height=260)
+    )
+    st.altair_chart(line_chart, use_container_width=True)
 
-        st.markdown("#### Scénarios enregistrés")
-        st.dataframe(df_scenarios, use_container_width=True)
-
-        labels = [f"{row.date} – {row.name}" for _, row in df_scenarios.reset_index(drop=True).iterrows()]
-        to_delete = st.multiselect("Supprimer des scénarios", labels)
-        if st.button("Delete"):
-            new_list = []
-            for scen, label in zip(df_scenarios.to_dict("records"), labels):
-                if label not in to_delete:
-                    new_list.append(scen)
-            st.session_state.scenarios = new_list
-            st.success("Scénarios mis à jour.")
-    else:
-        st.info("Aucun scénario sauvegardé pour l'instant. Utilise le bouton SAVE.")
+    st.dataframe(df_hist, use_container_width=True)
