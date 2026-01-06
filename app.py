@@ -6,18 +6,13 @@ from datetime import date
 # --------------------------------------------------
 # CONFIG
 # --------------------------------------------------
-st.set_page_config(
-    page_title="Waribei – Unit Economics",
-    layout="wide"
-)
-
+st.set_page_config(page_title="Waribei – Unit Economics", layout="wide")
 DUREE_PERIODE_LIQUIDITE_JOURS = 10
 
 # --------------------------------------------------
 # PRESETS (historique + défaut)
 # --------------------------------------------------
 PRESETS_BY_DATE = {
-    # Historique demandé
     date(2025, 6, 1): {
         "name": "Historique – Jun 2025",
         "revenu_pct": 3.73,
@@ -32,7 +27,6 @@ PRESETS_BY_DATE = {
         "cout_liquidite_10j_pct": 0.36,
         "defaut_30j_pct": 1.00,
     },
-    # Défaut dynamique demandé
     date(2026, 6, 1): {
         "name": "Default – Jun 2026",
         "revenu_pct": 3.80,
@@ -41,7 +35,6 @@ PRESETS_BY_DATE = {
         "defaut_30j_pct": 1.00,
     },
 }
-
 DEFAULT_DATE = date(2026, 6, 1)
 
 # --------------------------------------------------
@@ -51,16 +44,11 @@ if "scenarios" not in st.session_state:
     st.session_state.scenarios = []
 if "baseline" not in st.session_state:
     st.session_state.baseline = None
-
-# Date par défaut = juin 2026
 if "scenario_date" not in st.session_state:
     st.session_state.scenario_date = DEFAULT_DATE
-
-# Pour éviter d’écraser les réglages manuels sans arrêt
 if "last_loaded_date" not in st.session_state:
     st.session_state.last_loaded_date = None
 
-# Initialisation des keys unit economics si absentes
 for k, default_val in [
     ("revenu_pct", 3.8),
     ("cout_paiement_pct", 1.8),
@@ -74,114 +62,21 @@ for k, default_val in [
     if k not in st.session_state:
         st.session_state[k] = default_val
 
-# --------------------------------------------------
-# HELPERS UI (barres + molettes)
-# --------------------------------------------------
-def _clamp(x, lo, hi):
-    return max(lo, min(hi, x))
-
-def rate_widget(label: str, key: str, vmin: float, vmax: float, step: float, help_txt: str = ""):
-    """Taux : barre verticale + slider natif."""
-    if key not in st.session_state:
-        st.session_state[key] = (vmin + vmax) / 2
-
-    val = float(st.session_state[key])
-    pct = 0 if vmax == vmin else (val - vmin) / (vmax - vmin)
-    pct = _clamp(pct, 0, 1)
-
-    st.markdown(f"**{label}**")
-    bar_html = f"""
-    <div style="display:flex; align-items:center; gap:12px;">
-      <div style="height:140px; width:14px; border-radius:10px; border:1px solid rgba(0,0,0,0.25); background:#f3f4f6; position:relative;">
-        <div style="position:absolute; bottom:0; left:0; width:100%; height:{pct*100:.1f}%; border-radius:10px;
-                    background: linear-gradient(180deg, rgba(6,76,114,0.95), rgba(248,49,49,0.90));">
-        </div>
-      </div>
-      <div style="flex:1;">
-        <div style="font-size:22px; font-weight:700; line-height:1;">{val:.2f}%</div>
-        <div style="font-size:12px; opacity:0.7;">min {vmin:g}% • max {vmax:g}%</div>
-      </div>
-    </div>
-    """
-    st.markdown(bar_html, unsafe_allow_html=True)
-
-    st.slider(
-        label="",
-        min_value=float(vmin),
-        max_value=float(vmax),
-        value=float(val),
-        step=float(step),
-        key=key,
-        help=help_txt,
-        label_visibility="collapsed",
-    )
-
-def dial_widget(label: str, key: str, vmin: float, vmax: float, step: float, suffix: str = "", help_txt: str = ""):
-    """Volume : number_input + anneau (dial) en CSS."""
-    if key not in st.session_state:
-        st.session_state[key] = (vmin + vmax) / 2
-
-    val = float(st.session_state[key])
-    pct = 0 if vmax == vmin else (val - vmin) / (vmax - vmin)
-    pct = _clamp(pct, 0, 1)
-
-    st.markdown(f"**{label}**")
-    dial_html = f"""
-    <div style="display:flex; align-items:center; gap:14px; margin:6px 0 2px 0;">
-      <div style="height:78px; width:78px; border-radius:50%;
-                  background: conic-gradient(rgba(6,76,114,0.95) {pct*360:.1f}deg,
-                                            rgba(0,0,0,0.10) 0deg);
-                  display:flex; align-items:center; justify-content:center;
-                  border:1px solid rgba(0,0,0,0.18);">
-        <div style="height:54px; width:54px; border-radius:50%;
-                    background:white; display:flex; align-items:center; justify-content:center;
-                    font-weight:800; font-size:12px; color:#111;">
-          {pct*100:.0f}%
-        </div>
-      </div>
-      <div style="flex:1;">
-        <div style="font-size:12px; opacity:0.75;">min {vmin:g} • max {vmax:g}</div>
-      </div>
-    </div>
-    """
-    st.markdown(dial_html, unsafe_allow_html=True)
-
-    st.number_input(
-        label="",
-        min_value=float(vmin),
-        max_value=float(vmax),
-        value=float(val),
-        step=float(step),
-        key=key,
-        help=help_txt,
-        label_visibility="collapsed",
-    )
-    if suffix:
-        st.caption(suffix)
-
 def apply_preset_for_date(d: date, force: bool = False):
-    """
-    Applique le preset si la date correspond.
-    - force=True : écrase les valeurs même si user a déjà touché.
-    - force=False : ne réapplique que si on change de date (last_loaded_date).
-    """
     if d not in PRESETS_BY_DATE:
         return
-
     if (not force) and (st.session_state.last_loaded_date == d):
         return
 
-    preset = PRESETS_BY_DATE[d]
-    st.session_state["revenu_pct"] = float(preset["revenu_pct"])
-    st.session_state["cout_paiement_pct"] = float(preset["cout_paiement_pct"])
-    st.session_state["cout_liquidite_10j_pct"] = float(preset["cout_liquidite_10j_pct"])
-    st.session_state["defaut_30j_pct"] = float(preset["defaut_30j_pct"])
-    st.session_state["scenario_name_autofill"] = preset.get("name", f"Preset – {d.isoformat()}")
+    p = PRESETS_BY_DATE[d]
+    st.session_state["revenu_pct"] = float(p["revenu_pct"])
+    st.session_state["cout_paiement_pct"] = float(p["cout_paiement_pct"])
+    st.session_state["cout_liquidite_10j_pct"] = float(p["cout_liquidite_10j_pct"])
+    st.session_state["defaut_30j_pct"] = float(p["defaut_30j_pct"])
+    st.session_state["scenario_name_autofill"] = p.get("name", f"Preset – {d.isoformat()}")
     st.session_state.last_loaded_date = d
 
-# --------------------------------------------------
-# Seed historique (Jun 2025 + Dec 2025) une seule fois
-# --------------------------------------------------
+# Seed historique (une seule fois)
 if "seeded_history" not in st.session_state:
     st.session_state.seeded_history = False
 
@@ -200,31 +95,207 @@ if not st.session_state.seeded_history:
         )
     st.session_state.seeded_history = True
 
-# Applique par défaut le preset de juin 2026 au chargement initial
 apply_preset_for_date(st.session_state.scenario_date, force=False)
+
+# --------------------------------------------------
+# GLOBAL CSS (look & feel)
+# --------------------------------------------------
+st.markdown("""
+<style>
+/* Enlève un peu de bruit visuel */
+div.block-container { padding-top: 1.2rem; }
+h1, h2, h3 { letter-spacing: -0.02em; }
+
+/* Carte */
+.wb-card {
+  border: 1px solid rgba(0,0,0,0.10);
+  border-radius: 14px;
+  padding: 14px 14px 12px 14px;
+  background: rgba(255,255,255,0.70);
+}
+
+/* Barre verticale visuelle */
+.vbar-wrap { display:flex; align-items:center; gap:12px; }
+.vbar {
+  height: 168px;
+  width: 16px;
+  border-radius: 14px;
+  border: 1px solid rgba(0,0,0,0.18);
+  background: rgba(0,0,0,0.06);
+  position: relative;
+  overflow: hidden;
+}
+.vbar-fill {
+  position:absolute;
+  bottom:0;
+  left:0;
+  width:100%;
+  border-radius: 14px;
+}
+
+/* Valeur à droite de la barre */
+.vbar-metric {
+  display:flex;
+  flex-direction:column;
+  gap:2px;
+}
+.vbar-metric .big { font-size: 22px; font-weight: 800; line-height: 1; }
+.vbar-metric .sub { font-size: 12px; opacity: 0.7; }
+
+/* Molette visuelle */
+.knob-wrap { display:flex; align-items:center; gap:14px; }
+.knob {
+  height: 96px;
+  width: 96px;
+  border-radius: 50%;
+  position: relative;
+  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.35), rgba(0,0,0,0.25));
+  box-shadow: 0px 10px 22px rgba(0,0,0,0.25);
+  border: 1px solid rgba(0,0,0,0.25);
+}
+.knob::after{
+  content:"";
+  position:absolute;
+  inset: 12px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.40), rgba(0,0,0,0.20));
+  border: 1px solid rgba(0,0,0,0.25);
+}
+.knob-dot{
+  position:absolute;
+  height:10px; width:10px;
+  border-radius:50%;
+  background: rgba(255,255,255,0.85);
+  box-shadow: 0 0 10px rgba(255,255,255,0.55);
+  top: 26px; left: 28px;
+  z-index: 3;
+}
+.knob-arc{
+  position:absolute;
+  inset:-14px;
+  border-radius:50%;
+  border: 6px dashed rgba(0,0,0,0.35);
+  clip-path: inset(0 0 0 0 round 50%);
+  z-index: 1;
+}
+.knob-progress{
+  position:absolute;
+  inset:-14px;
+  border-radius:50%;
+  border: 6px dashed rgba(255,255,255,0.85);
+  clip-path: inset(0 0 0 0 round 50%);
+  filter: drop-shadow(0 0 6px rgba(255,255,255,0.35));
+  z-index: 2;
+}
+
+/* Petit label */
+.small-label { font-size: 12px; opacity: 0.7; margin-top: 4px; }
+</style>
+""", unsafe_allow_html=True)
+
+def _clamp(x, lo, hi):
+    return max(lo, min(hi, x))
+
+def vbar_widget(
+    label: str,
+    key: str,
+    vmin: float,
+    vmax: float,
+    step: float,
+    help_txt: str,
+    color_mode: str,
+):
+    """
+    Barre verticale VISUELLE + input Streamlit (en dessous).
+    color_mode:
+      - "rev": haut vert / bas rouge
+      - "cost": haut rouge / bas vert
+    """
+    if key not in st.session_state:
+        st.session_state[key] = (vmin + vmax) / 2
+
+    val = float(st.session_state[key])
+    pct = 0 if vmax == vmin else (val - vmin) / (vmax - vmin)
+    pct = _clamp(pct, 0, 1)
+
+    if color_mode == "rev":
+        # haut vert, bas rouge (donc fill = gradient bas->haut rouge->vert)
+        grad = "linear-gradient(180deg, rgba(34,197,94,0.95), rgba(239,68,68,0.95))"
+        # mais comme fill part du bas, on inverse pour que bas rouge -> haut vert
+        grad = "linear-gradient(180deg, rgba(239,68,68,0.95), rgba(34,197,94,0.95))"
+    else:
+        # haut rouge, bas vert
+        grad = "linear-gradient(180deg, rgba(34,197,94,0.95), rgba(239,68,68,0.95))"
+
+    st.markdown(f"**{label}**")
+    st.markdown(
+        f"""
+        <div class="vbar-wrap">
+          <div class="vbar">
+            <div class="vbar-fill" style="height:{pct*100:.1f}%; background:{grad};"></div>
+          </div>
+          <div class="vbar-metric">
+            <div class="big">{val:.2f}%</div>
+            <div class="sub">min {vmin:g}% • max {vmax:g}%</div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
+
+    # ⚠️ Limitation Streamlit : pas de drag directement dans la barre sans composant custom.
+    st.slider(
+        label="",
+        min_value=float(vmin),
+        max_value=float(vmax),
+        value=float(val),
+        step=float(step),
+        key=key,
+        help=help_txt,
+        label_visibility="collapsed",
+    )
+
+def knob_visual(label: str, value: float, vmin: float, vmax: float):
+    pct = 0 if vmax == vmin else (value - vmin) / (vmax - vmin)
+    pct = _clamp(pct, 0, 1)
+    # arc ~ 270° (de -225° à +45°)
+    deg = -225 + pct * 270
+
+    # Trick: on simule un "progress" arc en tournant un dashed ring (visuel)
+    st.markdown(f"**{label}**")
+    st.markdown(
+        f"""
+        <div class="knob-wrap">
+          <div style="position:relative; width:110px; height:110px;">
+            <div class="knob-arc"></div>
+            <div class="knob-progress" style="transform: rotate({deg}deg);"></div>
+            <div class="knob">
+              <div class="knob-dot"></div>
+            </div>
+          </div>
+          <div style="display:flex; flex-direction:column; gap:2px;">
+            <div style="font-size:22px; font-weight:800; line-height:1;">{value:,.0f}</div>
+            <div style="font-size:12px; opacity:0.7;">min {vmin:g} • max {vmax:g}</div>
+          </div>
+        </div>
+        """,
+        unsafe_allow_html=True,
+    )
 
 # --------------------------------------------------
 # NAVIGATION
 # --------------------------------------------------
-page = st.sidebar.radio(
-    "Navigation",
-    ["Simulateur", "Comment je modélise une courbe ?"]
-)
+page = st.sidebar.radio("Navigation", ["Simulateur", "Comment je modélise une courbe ?"])
 
 # ==================================================
 # PAGE 2 : EXPLICATION
 # ==================================================
 if page == "Comment je modélise une courbe ?":
     st.title("Comment fonctionne le simulateur Waribei ?")
-
     st.markdown("""
-Ce simulateur relie les **unit economics (par transaction)** à des **hypothèses de volume**
-pour produire des métriques lisibles (revenus, contribution, volumes nécessaires).
-
-- Les points **Jun 2025** et **Dec 2025** sont préchargés comme historique.
-- Par défaut, l’interface se positionne sur **Jun 2026** avec des paramètres “target”.
-- Si tu changes la date vers une date qui a un preset (Jun 2025 / Dec 2025 / Jun 2026),
-  les valeurs se repositionnent automatiquement.
+- Historique préchargé : **Jun 2025** et **Dec 2025**
+- Par défaut : **Jun 2026** avec tes valeurs target
+- Si tu changes la date vers une date “preset”, les valeurs se repositionnent automatiquement.
 """)
 
 # ==================================================
@@ -237,7 +308,6 @@ else:
     top = st.columns([0.7, 0.3])
     with top[0]:
         st.title("Unit Economics – Waribei")
-
     with top[1]:
         try:
             st.image("logo_waribei_icon@2x.png", width=100)
@@ -247,189 +317,101 @@ else:
     st.markdown("---")
 
     # --------------------------------------------------
-    # MAIN ZONE
+    # LAYOUT PRINCIPAL
+    # On veut voir en premier:
+    #  - Hypothèses par transaction
+    #  - Variables de volume
+    # Et on déplace Inputs + Scénarios rapides + Date en bas à droite
     # --------------------------------------------------
-    left, right = st.columns([0.62, 0.38])
+    main_left, main_right = st.columns([0.68, 0.32], gap="large")
 
-    # --------------------------------------------------
-    # LEFT : INPUTS (nouvelle UI type croquis)
-    # --------------------------------------------------
-    with left:
-        st.subheader("Inputs")
+    # =========================
+    # MAIN LEFT : Hypothèses par transaction
+    # =========================
+    with main_left:
+        st.markdown('<div class="wb-card">', unsafe_allow_html=True)
+        st.subheader("Hypothèses par transaction")
 
-        # ---- Scénarios rapides
-        with st.container(border=True):
-            c1, c2 = st.columns([0.55, 0.45])
-            with c1:
-                scenario = st.selectbox(
-                    "Scénarios rapides",
-                    [
-                        "Custom",
-                        "Aujourd'hui",
-                        "Open Banking",
-                        "Supplier funding",
-                        "OB + Supplier (défaut bon 0,8%)",
-                        "OB + Supplier (défaut moyen 1,2%)",
-                        "OB + Supplier (défaut mauvais 2,0%)",
-                    ],
-                )
-            with c2:
-                st.caption("Choisis un scénario puis ajuste les curseurs.")
+        c1, c2, c3, c4 = st.columns(4, gap="large")
+        with c1:
+            vbar_widget(
+                "Revenus / trx",
+                key="revenu_pct",
+                vmin=1.0, vmax=5.0, step=0.01,
+                help_txt="Take-rate / commission moyenne.",
+                color_mode="rev",   # vert en haut, rouge en bas
+            )
+        with c2:
+            vbar_widget(
+                "Coût paiement / trx",
+                key="cout_paiement_pct",
+                vmin=0.0, vmax=2.0, step=0.01,
+                help_txt="Coût des rails de paiement.",
+                color_mode="cost",  # rouge en haut, vert en bas
+            )
+        with c3:
+            vbar_widget(
+                "Coût liquidité (10j)",
+                key="cout_liquidite_10j_pct",
+                vmin=0.0, vmax=1.5, step=0.01,
+                help_txt="Coût de financement sur 10 jours.",
+                color_mode="cost",
+            )
+        with c4:
+            vbar_widget(
+                "Défaut 30j / trx",
+                key="defaut_30j_pct",
+                vmin=0.0, vmax=5.0, step=0.01,
+                help_txt="Perte attendue (net) à 30 jours.",
+                color_mode="cost",
+            )
 
-        # Mapping scénarios rapides (sans casser les presets date)
-        if scenario == "Aujourd'hui":
-            # Si tu veux : tu peux décider que "Aujourd'hui" = ton preset Jun 2026,
-            # ou garder tes anciennes valeurs. Ici, je le mets sur Jun 2026.
-            apply_preset_for_date(date(2026, 6, 1), force=True)
-
-        elif scenario == "Open Banking":
-            st.session_state["cout_paiement_pct"] = 0.5
-
-        elif scenario == "Supplier funding":
-            st.session_state["cout_liquidite_10j_pct"] = 0.055
-
-        elif scenario == "OB + Supplier (défaut bon 0,8%)":
-            st.session_state["cout_paiement_pct"] = 0.5
-            st.session_state["cout_liquidite_10j_pct"] = 0.055
-            st.session_state["defaut_30j_pct"] = 0.8
-
-        elif scenario == "OB + Supplier (défaut moyen 1,2%)":
-            st.session_state["cout_paiement_pct"] = 0.5
-            st.session_state["cout_liquidite_10j_pct"] = 0.055
-            st.session_state["defaut_30j_pct"] = 1.2
-
-        elif scenario == "OB + Supplier (défaut mauvais 2,0%)":
-            st.session_state["cout_paiement_pct"] = 0.5
-            st.session_state["cout_liquidite_10j_pct"] = 0.055
-            st.session_state["defaut_30j_pct"] = 2.0
-
-        st.markdown("")
-
-        # ---- Date (et presets)
-        with st.container(border=True):
-            dcols = st.columns([0.7, 0.3])
-            with dcols[1]:
-                if st.button("Today"):
-                    st.session_state["scenario_date"] = DEFAULT_DATE
-                    apply_preset_for_date(DEFAULT_DATE, force=True)
-
-            with dcols[0]:
-                picked = st.date_input(
-                    "Date",
-                    value=st.session_state.get("scenario_date", DEFAULT_DATE),
-                )
-                st.session_state["scenario_date"] = picked
-
-            # Applique preset si la date match une date spéciale
-            apply_preset_for_date(st.session_state["scenario_date"], force=False)
+        st.markdown("</div>", unsafe_allow_html=True)
 
         st.markdown("")
 
         # =========================
-        # 1) HYPOTHESES PAR TRANSACTION (barres)
+        # Variables de volume + opérationnel (on peut les mettre sous le bloc principal)
         # =========================
-        with st.container(border=True):
-            st.markdown("### Hypothèses par transaction")
+        st.markdown('<div class="wb-card">', unsafe_allow_html=True)
+        st.subheader("Variables de volume")
 
-            r1, r2, r3, r4 = st.columns(4)
+        vcol1, vcol2 = st.columns([0.58, 0.42], gap="large")
 
-            with r1:
-                rate_widget(
-                    label="Revenus / trx",
-                    key="revenu_pct",
-                    vmin=1.0, vmax=5.0,
-                    step=0.01,
-                    help_txt="Take-rate / commission moyenne sur une transaction."
-                )
+        with vcol1:
+            # Loan book : molette VISUELLE + input
+            knob_visual("Loan book moyen (k€)", float(st.session_state["loan_book_k"]), 50.0, 1000.0)
+            st.number_input(
+                label="",
+                min_value=50.0,
+                max_value=1000.0,
+                step=10.0,
+                value=float(st.session_state["loan_book_k"]),
+                key="loan_book_k",
+                label_visibility="collapsed",
+            )
+            st.caption("Encours moyen.")
 
-            with r2:
-                rate_widget(
-                    label="Coût paiement / trx",
-                    key="cout_paiement_pct",
-                    vmin=0.0, vmax=2.0,
-                    step=0.01,
-                    help_txt="Coût PSP / wallet / rails de paiement."
-                )
+        with vcol2:
+            st.markdown("**Cycles de liquidité / mois**")
+            st.caption("1 → 4")
+            st.slider(
+                label="",
+                min_value=1.0,
+                max_value=4.0,
+                value=float(st.session_state.get("cycles_per_month", 2.9)),
+                step=0.1,
+                key="cycles_per_month",
+                label_visibility="collapsed",
+            )
 
-            with r3:
-                rate_widget(
-                    label="Coût liquidité (10j)",
-                    key="cout_liquidite_10j_pct",
-                    vmin=0.0, vmax=1.5,
-                    step=0.01,
-                    help_txt="Coût de financement sur 10 jours."
-                )
+        st.markdown("</div>", unsafe_allow_html=True)
 
-            with r4:
-                rate_widget(
-                    label="Défaut 30j / trx",
-                    key="defaut_30j_pct",
-                    vmin=0.0, vmax=5.0,
-                    step=0.01,
-                    help_txt="Perte attendue (net) à 30 jours."
-                )
-
-        st.markdown("")
-
-        # =========================
-        # 2) VARIABLES DE VOLUME (molette + slider latéral)
-        # =========================
-        with st.container(border=True):
-            st.markdown("### Variables de volume")
-
-            vcol1, vcol2 = st.columns([0.55, 0.45], gap="large")
-
-            with vcol1:
-                dial_widget(
-                    label="Loan book moyen (k€)",
-                    key="loan_book_k",
-                    vmin=50.0, vmax=1000.0,
-                    step=10.0,
-                    suffix="Encours moyen."
-                )
-
-            with vcol2:
-                st.markdown("**Cycles de liquidité / mois**")
-                st.caption("1 → 4")
-                st.slider(
-                    label="",
-                    min_value=1.0,
-                    max_value=4.0,
-                    value=float(st.session_state.get("cycles_per_month", 2.9)),
-                    step=0.1,
-                    key="cycles_per_month",
-                    label_visibility="collapsed",
-                )
-
-        st.markdown("")
-
-        # =========================
-        # 3) HYPOTHESES OPERATIONNELLES (molettes)
-        # =========================
-        with st.container(border=True):
-            st.markdown("### Hypothèses opérationnelles")
-
-            o1, o2 = st.columns(2, gap="large")
-
-            with o1:
-                dial_widget(
-                    label="Valeur moyenne par prêt (€)",
-                    key="avg_loan_value_eur",
-                    vmin=150.0, vmax=1000.0,
-                    step=50.0,
-                    suffix="Panier moyen financé."
-                )
-
-            with o2:
-                dial_widget(
-                    label="Transactions / client / mois",
-                    key="tx_per_client_per_month",
-                    vmin=1.0, vmax=12.0,
-                    step=0.5,
-                    suffix="Rythme de réachat."
-                )
-
-        # ---- récupère les valeurs depuis le state (moteur inchangé)
+    # =========================
+    # MAIN RIGHT : Outputs + petit panneau Inputs en bas
+    # =========================
+    with main_right:
+        # ------- CALCULS (moteur inchangé)
         revenu_pct = float(st.session_state["revenu_pct"])
         cout_paiement_pct = float(st.session_state["cout_paiement_pct"])
         cout_liquidite_10j_pct = float(st.session_state["cout_liquidite_10j_pct"])
@@ -439,18 +421,13 @@ else:
         avg_loan_value_eur = float(st.session_state["avg_loan_value_eur"])
         tx_per_client_per_month = float(st.session_state["tx_per_client_per_month"])
 
-        # --------------------------------------------------
-        # CALCULS (inchangés)
-        # --------------------------------------------------
         taux_liquidite_annuel_pct = cout_liquidite_10j_pct * 365 / DUREE_PERIODE_LIQUIDITE_JOURS
-
         cout_total_pct = cout_paiement_pct + cout_liquidite_10j_pct + defaut_30j_pct
         contribution_margin_pct = revenu_pct - cout_total_pct
 
         monthly_volume_eur = loan_book_k * 1000 * cycles_per_month
         monthly_revenue_eur = monthly_volume_eur * (revenu_pct / 100)
         annual_revenue_eur = monthly_revenue_eur * 12
-
         contribution_value_k = loan_book_k * cycles_per_month * contribution_margin_pct / 100
 
         nb_loans_per_month = monthly_volume_eur / avg_loan_value_eur if avg_loan_value_eur > 0 else 0.0
@@ -458,30 +435,18 @@ else:
 
         revenue_per_loan_eur = avg_loan_value_eur * (revenu_pct / 100)
         revenue_per_client_month_eur = revenue_per_loan_eur * tx_per_client_per_month
-
         take_rate_effective_pct = (monthly_revenue_eur / monthly_volume_eur * 100) if monthly_volume_eur > 0 else 0.0
 
-        st.caption(f"Coût de liquidité annualisé ≈ **{taux_liquidite_annuel_pct:.1f} %**")
-
-    # --------------------------------------------------
-    # RIGHT : OUTPUTS
-    # --------------------------------------------------
-    with right:
+        # ------- OUTPUTS
         st.subheader("Contribution")
 
-        st.markdown("Contribution margin / trx")
         st.markdown(
             f"""
-            <div style="
-                border:2px solid #064C72;
-                padding:16px;
-                border-radius:10px;
-                font-size:28px;
-                font-weight:800;
-                text-align:center;
-                background-color:#FFDBCC;
-                color:#064C72;">
-                {contribution_margin_pct:.2f} %
+            <div style="border:2px solid #064C72; padding:16px; border-radius:12px;
+                        font-size:28px; font-weight:900; text-align:center;
+                        background-color:#FFDBCC; color:#064C72;">
+              {contribution_margin_pct:.2f} %
+              <div class="small-label">Contribution margin / trx</div>
             </div>
             """,
             unsafe_allow_html=True,
@@ -489,113 +454,98 @@ else:
 
         st.markdown("")
 
-        st.markdown("Contribution value / mois")
         st.markdown(
             f"""
-            <div style="
-                border:2px solid #1B5A43;
-                padding:14px;
-                border-radius:10px;
-                font-size:22px;
-                font-weight:800;
-                text-align:center;
-                background-color:#D8ECFE;
-                color:#1B5A43;">
-                {contribution_value_k:.2f} k€
+            <div style="border:2px solid #1B5A43; padding:14px; border-radius:12px;
+                        font-size:22px; font-weight:900; text-align:center;
+                        background-color:#D8ECFE; color:#1B5A43;">
+              {contribution_value_k:.2f} k€
+              <div class="small-label">Contribution value / mois</div>
             </div>
             """,
             unsafe_allow_html=True,
         )
-        st.caption(
-            f"Hypothèses : loan book moyen {loan_book_k:.0f} k€, "
-            f"{cycles_per_month:.1f} cycles / mois."
-        )
+
+        st.caption(f"Coût de liquidité annualisé ≈ **{taux_liquidite_annuel_pct:.1f}%**")
 
         st.markdown("")
 
         st.subheader("Revenus")
-
         r1, r2 = st.columns(2)
         with r1:
-            st.markdown(
-                f"""
-                <div style="border:1px solid #DDD;padding:10px;border-radius:10px;font-size:18px;font-weight:700;text-align:center;">
-                    {monthly_revenue_eur:,.0f} €<br/>
-                    <span style="font-size:13px;font-weight:400;opacity:0.75;">Revenue / mois</span>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            st.metric("Revenue / mois", f"{monthly_revenue_eur:,.0f} €")
         with r2:
-            st.markdown(
-                f"""
-                <div style="border:1px solid #DDD;padding:10px;border-radius:10px;font-size:18px;font-weight:700;text-align:center;">
-                    {annual_revenue_eur:,.0f} €<br/>
-                    <span style="font-size:13px;font-weight:400;opacity:0.75;">Revenue / an</span>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            st.metric("Revenue / an", f"{annual_revenue_eur:,.0f} €")
 
         r3, r4 = st.columns(2)
         with r3:
-            st.markdown(
-                f"""
-                <div style="border:1px solid #DDD;padding:10px;border-radius:10px;font-size:18px;font-weight:700;text-align:center;">
-                    {revenue_per_loan_eur:,.0f} €<br/>
-                    <span style="font-size:13px;font-weight:400;opacity:0.75;">Revenue / prêt</span>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            st.metric("Revenue / prêt", f"{revenue_per_loan_eur:,.0f} €")
         with r4:
-            st.markdown(
-                f"""
-                <div style="border:1px solid #DDD;padding:10px;border-radius:10px;font-size:18px;font-weight:700;text-align:center;">
-                    {revenue_per_client_month_eur:,.0f} €<br/>
-                    <span style="font-size:13px;font-weight:400;opacity:0.75;">Revenue / client / mois</span>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            st.metric("Revenue / client / mois", f"{revenue_per_client_month_eur:,.0f} €")
 
-        st.caption(
-            f"Take-rate effectif ≈ {take_rate_effective_pct:.2f} % "
-            f"sur un volume mensuel de {monthly_volume_eur:,.0f} €."
-        )
+        st.caption(f"Take-rate effectif ≈ {take_rate_effective_pct:.2f}% sur {monthly_volume_eur:,.0f} € / mois.")
 
         st.markdown("")
-        st.markdown("**Volumes nécessaires / mois**")
 
+        st.subheader("Volumes nécessaires / mois")
         m1, m2 = st.columns(2)
         with m1:
-            st.markdown(
-                f"""
-                <div style="border:1px solid #DDD;padding:10px;border-radius:10px;font-size:18px;font-weight:700;text-align:center;">
-                    {nb_loans_per_month:,.0f}<br/>
-                    <span style="font-size:13px;font-weight:400;opacity:0.75;">prêts / mois</span>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            st.metric("Prêts / mois", f"{nb_loans_per_month:,.0f}")
         with m2:
-            st.markdown(
-                f"""
-                <div style="border:1px solid #DDD;padding:10px;border-radius:10px;font-size:18px;font-weight:700;text-align:center;">
-                    {nb_clients_per_month:,.0f}<br/>
-                    <span style="font-size:13px;font-weight:400;opacity:0.75;">clients / mois</span>
-                </div>
-                """,
-                unsafe_allow_html=True,
-            )
+            st.metric("Clients / mois", f"{nb_clients_per_month:,.0f}")
 
-        st.caption(
-            f"Basé sur {avg_loan_value_eur:.0f} € par prêt et {tx_per_client_per_month:.1f} transactions / client / mois."
+        st.markdown("---")
+
+        # =========================
+        # PANEL BAS DROITE : Inputs + Scénarios rapides + Date
+        # =========================
+        st.markdown('<div class="wb-card">', unsafe_allow_html=True)
+        st.markdown("### Inputs")
+
+        scenario = st.selectbox(
+            "Scénarios rapides",
+            [
+                "Custom",
+                "Aujourd'hui",
+                "Open Banking",
+                "Supplier funding",
+                "OB + Supplier (défaut bon 0,8%)",
+                "OB + Supplier (défaut moyen 1,2%)",
+                "OB + Supplier (défaut mauvais 2,0%)",
+            ],
         )
+        st.caption("Choisis un scénario puis ajuste les curseurs.")
 
-        st.markdown("")
+        if scenario == "Aujourd'hui":
+            apply_preset_for_date(date(2026, 6, 1), force=True)
+        elif scenario == "Open Banking":
+            st.session_state["cout_paiement_pct"] = 0.5
+        elif scenario == "Supplier funding":
+            st.session_state["cout_liquidite_10j_pct"] = 0.055
+        elif scenario == "OB + Supplier (défaut bon 0,8%)":
+            st.session_state["cout_paiement_pct"] = 0.5
+            st.session_state["cout_liquidite_10j_pct"] = 0.055
+            st.session_state["defaut_30j_pct"] = 0.8
+        elif scenario == "OB + Supplier (défaut moyen 1,2%)":
+            st.session_state["cout_paiement_pct"] = 0.5
+            st.session_state["cout_liquidite_10j_pct"] = 0.055
+            st.session_state["defaut_30j_pct"] = 1.2
+        elif scenario == "OB + Supplier (défaut mauvais 2,0%)":
+            st.session_state["cout_paiement_pct"] = 0.5
+            st.session_state["cout_liquidite_10j_pct"] = 0.055
+            st.session_state["defaut_30j_pct"] = 2.0
 
-        # ---- SAVE scenario (avec autofill du label si preset)
+        dcols = st.columns([0.72, 0.28])
+        with dcols[1]:
+            if st.button("Today"):
+                st.session_state["scenario_date"] = DEFAULT_DATE
+                apply_preset_for_date(DEFAULT_DATE, force=True)
+        with dcols[0]:
+            picked = st.date_input("Date", value=st.session_state.get("scenario_date", DEFAULT_DATE))
+            st.session_state["scenario_date"] = picked
+
+        apply_preset_for_date(st.session_state["scenario_date"], force=False)
+
         default_label = st.session_state.get("scenario_name_autofill", "Scenario")
         scenario_name = st.text_input("Label du scénario", value=default_label)
 
@@ -603,10 +553,10 @@ else:
             scenario_obj = {
                 "date": st.session_state["scenario_date"],
                 "name": scenario_name,
-                "revenu_pct": revenu_pct,
-                "cout_paiement_pct": cout_paiement_pct,
-                "cout_liquidite_10j_pct": cout_liquidite_10j_pct,
-                "defaut_30j_pct": defaut_30j_pct,
+                "revenu_pct": float(st.session_state["revenu_pct"]),
+                "cout_paiement_pct": float(st.session_state["cout_paiement_pct"]),
+                "cout_liquidite_10j_pct": float(st.session_state["cout_liquidite_10j_pct"]),
+                "defaut_30j_pct": float(st.session_state["defaut_30j_pct"]),
                 "taux_liquidite_annuel_pct": taux_liquidite_annuel_pct,
                 "contribution_margin_pct": contribution_margin_pct,
                 "cycles_per_month": cycles_per_month,
@@ -628,10 +578,12 @@ else:
                 st.session_state.baseline = scenario_obj
             st.success(f"Scénario '{scenario_name}' sauvegardé ({st.session_state['scenario_date']}).")
 
+        st.markdown("</div>", unsafe_allow_html=True)
+
     st.markdown("---")
 
     # --------------------------------------------------
-    # WATERFALL DATA PREP
+    # WATERFALL
     # --------------------------------------------------
     def make_waterfall_df(revenue, pay_cost, liq_cost, default_cost, margin):
         steps = ["Revenu", "Coût paiement", "Coût liquidité (10j)", "Défaut 30j", "Contribution"]
@@ -658,24 +610,20 @@ else:
 
         return pd.DataFrame({"step": steps, "value": values, "start": start, "end": end, "type": types})
 
-    # --------------------------------------------------
-    # WATERFALL CHART
-    # --------------------------------------------------
     st.markdown("### Décomposition par transaction (waterfall)")
-
     wf_df = make_waterfall_df(
-        revenu_pct,
-        cout_paiement_pct,
-        cout_liquidite_10j_pct,
-        defaut_30j_pct,
-        contribution_margin_pct
+        float(st.session_state["revenu_pct"]),
+        float(st.session_state["cout_paiement_pct"]),
+        float(st.session_state["cout_liquidite_10j_pct"]),
+        float(st.session_state["defaut_30j_pct"]),
+        float(st.session_state["revenu_pct"]) - (
+            float(st.session_state["cout_paiement_pct"]) +
+            float(st.session_state["cout_liquidite_10j_pct"]) +
+            float(st.session_state["defaut_30j_pct"])
+        )
     )
 
-    color_scale = alt.Scale(
-        domain=["positive", "negative", "total"],
-        range=["#1B5A43", "#F83131", "#064C72"],
-    )
-
+    color_scale = alt.Scale(domain=["positive", "negative", "total"], range=["#1B5A43", "#F83131", "#064C72"])
     waterfall_chart = (
         alt.Chart(wf_df)
         .mark_bar()
@@ -686,7 +634,6 @@ else:
             color=alt.Color("type:N", scale=color_scale, legend=None),
         )
     )
-
     wf_labels = (
         alt.Chart(wf_df)
         .mark_text(dy=-6, color="#333", fontSize=11)
@@ -696,26 +643,22 @@ else:
             text=alt.Text("value:Q", format=".2f"),
         )
     )
-
     st.altair_chart((waterfall_chart + wf_labels).properties(height=260), use_container_width=True)
 
     # --------------------------------------------------
-    # TIME SERIES CHART (inclut l’historique préchargé)
+    # TIME SERIES
     # --------------------------------------------------
     st.markdown("### Évolution dans le temps")
 
     if st.session_state.scenarios:
         df_scenarios = pd.DataFrame(st.session_state.scenarios).sort_values("date")
 
-        # Si certains anciens scénarios n'ont pas toutes les colonnes (seed historique),
-        # on calcule contribution_margin_pct à la volée si manquante
         if "contribution_margin_pct" not in df_scenarios.columns:
             df_scenarios["contribution_margin_pct"] = (
                 df_scenarios["revenu_pct"]
                 - (df_scenarios["cout_paiement_pct"] + df_scenarios["cout_liquidite_10j_pct"] + df_scenarios["defaut_30j_pct"])
             )
         else:
-            # fill NaN contribution_margin_pct
             mask = df_scenarios["contribution_margin_pct"].isna()
             if mask.any():
                 df_scenarios.loc[mask, "contribution_margin_pct"] = (
@@ -731,18 +674,8 @@ else:
             ["date", "revenu_pct", "cout_paiement_pct", "cout_liquidite_10j_pct", "defaut_30j_pct", "contribution_margin_pct"]
         ].melt(id_vars="date", var_name="metric", value_name="value")
 
-        metric_order = [
-            "revenu_pct",
-            "cout_paiement_pct",
-            "cout_liquidite_10j_pct",
-            "defaut_30j_pct",
-            "contribution_margin_pct",
-        ]
-
-        color_line = alt.Scale(
-            domain=metric_order,
-            range=["#1B5A43", "#F83131", "#8ECAE6", "#FFC444", "#064C72"],
-        )
+        metric_order = ["revenu_pct", "cout_paiement_pct", "cout_liquidite_10j_pct", "defaut_30j_pct", "contribution_margin_pct"]
+        color_line = alt.Scale(domain=metric_order, range=["#1B5A43", "#F83131", "#8ECAE6", "#FFC444", "#064C72"])
 
         line_chart = (
             alt.Chart(line_df)
@@ -754,7 +687,6 @@ else:
             )
             .properties(height=260)
         )
-
         st.altair_chart(line_chart, use_container_width=True)
 
         st.markdown("#### Scénarios enregistrés")
@@ -762,7 +694,6 @@ else:
 
         labels = [f"{row.date} – {row.name}" for _, row in df_scenarios.reset_index(drop=True).iterrows()]
         to_delete = st.multiselect("Supprimer des scénarios", labels)
-
         if st.button("Delete"):
             new_list = []
             for scen, label in zip(df_scenarios.to_dict("records"), labels):
