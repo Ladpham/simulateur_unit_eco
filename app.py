@@ -62,6 +62,7 @@ for k, default_val in [
     if k not in st.session_state:
         st.session_state[k] = default_val
 
+
 def apply_preset_for_date(d: date, force: bool = False):
     if d not in PRESETS_BY_DATE:
         return
@@ -75,6 +76,7 @@ def apply_preset_for_date(d: date, force: bool = False):
     st.session_state["defaut_30j_pct"] = float(p["defaut_30j_pct"])
     st.session_state["scenario_name_autofill"] = p.get("name", f"Preset – {d.isoformat()}")
     st.session_state.last_loaded_date = d
+
 
 # Seed historique (une seule fois)
 if "seeded_history" not in st.session_state:
@@ -100,13 +102,13 @@ apply_preset_for_date(st.session_state.scenario_date, force=False)
 # --------------------------------------------------
 # GLOBAL CSS (look & feel)
 # --------------------------------------------------
-st.markdown("""
+st.markdown(
+    """
 <style>
-/* Enlève un peu de bruit visuel */
 div.block-container { padding-top: 1.2rem; }
 h1, h2, h3 { letter-spacing: -0.02em; }
 
-/* Carte */
+/* Card */
 .wb-card {
   border: 1px solid rgba(0,0,0,0.10);
   border-radius: 14px;
@@ -114,7 +116,7 @@ h1, h2, h3 { letter-spacing: -0.02em; }
   background: rgba(255,255,255,0.70);
 }
 
-/* Barre verticale visuelle */
+/* Vertical bar visual */
 .vbar-wrap { display:flex; align-items:center; gap:12px; }
 .vbar {
   height: 168px;
@@ -132,8 +134,6 @@ h1, h2, h3 { letter-spacing: -0.02em; }
   width:100%;
   border-radius: 14px;
 }
-
-/* Valeur à droite de la barre */
 .vbar-metric {
   display:flex;
   flex-direction:column;
@@ -142,59 +142,45 @@ h1, h2, h3 { letter-spacing: -0.02em; }
 .vbar-metric .big { font-size: 22px; font-weight: 800; line-height: 1; }
 .vbar-metric .sub { font-size: 12px; opacity: 0.7; }
 
-/* Molette visuelle */
-.knob-wrap { display:flex; align-items:center; gap:14px; }
-.knob {
-  height: 96px;
-  width: 96px;
-  border-radius: 50%;
+/* Simple knob like sketch */
+.knob-wrap { display:flex; align-items:center; gap:12px; }
+.knob-shell {
+  width: 110px; height: 110px;
   position: relative;
-  background: radial-gradient(circle at 30% 30%, rgba(255,255,255,0.35), rgba(0,0,0,0.25));
-  box-shadow: 0px 10px 22px rgba(0,0,0,0.25);
-  border: 1px solid rgba(0,0,0,0.25);
 }
-.knob::after{
-  content:"";
-  position:absolute;
-  inset: 12px;
+.knob-ring {
+  width: 90px; height: 90px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, rgba(255,255,255,0.40), rgba(0,0,0,0.20));
-  border: 1px solid rgba(0,0,0,0.25);
+  border: 3px solid rgba(0,0,0,0.55);
+  position:absolute; left:10px; top:10px;
+  background: rgba(255,255,255,0.15);
 }
-.knob-dot{
-  position:absolute;
-  height:10px; width:10px;
-  border-radius:50%;
-  background: rgba(255,255,255,0.85);
-  box-shadow: 0 0 10px rgba(255,255,255,0.55);
-  top: 26px; left: 28px;
-  z-index: 3;
-}
-.knob-arc{
-  position:absolute;
-  inset:-14px;
-  border-radius:50%;
-  border: 6px dashed rgba(0,0,0,0.35);
+.knob-ticks {
+  position:absolute; inset:0;
+  border-radius: 50%;
+  border: 6px dotted rgba(0,0,0,0.25);
   clip-path: inset(0 0 0 0 round 50%);
-  z-index: 1;
+  opacity: 0.9;
 }
-.knob-progress{
+.knob-needle {
   position:absolute;
-  inset:-14px;
-  border-radius:50%;
-  border: 6px dashed rgba(255,255,255,0.85);
-  clip-path: inset(0 0 0 0 round 50%);
-  filter: drop-shadow(0 0 6px rgba(255,255,255,0.35));
-  z-index: 2;
+  width: 6px; height: 44px;
+  background: rgba(6,76,114,0.95);
+  left: 52px; top: 14px;
+  transform-origin: 50% 85%;
+  border-radius: 4px;
+  box-shadow: 0 0 0 1px rgba(0,0,0,0.08);
 }
-
-/* Petit label */
 .small-label { font-size: 12px; opacity: 0.7; margin-top: 4px; }
 </style>
-""", unsafe_allow_html=True)
+""",
+    unsafe_allow_html=True,
+)
+
 
 def _clamp(x, lo, hi):
     return max(lo, min(hi, x))
+
 
 def vbar_widget(
     label: str,
@@ -206,7 +192,7 @@ def vbar_widget(
     color_mode: str,
 ):
     """
-    Barre verticale VISUELLE + input Streamlit (en dessous).
+    Barre verticale VISUELLE + slider Streamlit.
     color_mode:
       - "rev": haut vert / bas rouge
       - "cost": haut rouge / bas vert
@@ -218,14 +204,13 @@ def vbar_widget(
     pct = 0 if vmax == vmin else (val - vmin) / (vmax - vmin)
     pct = _clamp(pct, 0, 1)
 
+    # ✅ Couleurs corrigées
     if color_mode == "rev":
-        # haut vert, bas rouge (donc fill = gradient bas->haut rouge->vert)
+        # bottom red -> top green
         grad = "linear-gradient(180deg, rgba(34,197,94,0.95), rgba(239,68,68,0.95))"
-        # mais comme fill part du bas, on inverse pour que bas rouge -> haut vert
-        grad = "linear-gradient(180deg, rgba(239,68,68,0.95), rgba(34,197,94,0.95))"
     else:
-        # haut rouge, bas vert
-        grad = "linear-gradient(180deg, rgba(34,197,94,0.95), rgba(239,68,68,0.95))"
+        # bottom green -> top red
+        grad = "linear-gradient(180deg, rgba(239,68,68,0.95), rgba(34,197,94,0.95))"
 
     st.markdown(f"**{label}**")
     st.markdown(
@@ -243,7 +228,7 @@ def vbar_widget(
         unsafe_allow_html=True,
     )
 
-    # ⚠️ Limitation Streamlit : pas de drag directement dans la barre sans composant custom.
+    # Limitation Streamlit: pas de drag direct dans la barre sans composant custom.
     st.slider(
         label="",
         min_value=float(vmin),
@@ -255,26 +240,28 @@ def vbar_widget(
         label_visibility="collapsed",
     )
 
-def knob_visual(label: str, value: float, vmin: float, vmax: float):
+
+def knob_simple_visual(label: str, value: float, vmin: float, vmax: float, value_fmt: str = "{:,.0f}"):
+    """
+    Visuel très simple comme le croquis: anneau + ticks + aiguille.
+    (Rotation basée sur 270° de course.)
+    """
     pct = 0 if vmax == vmin else (value - vmin) / (vmax - vmin)
     pct = _clamp(pct, 0, 1)
-    # arc ~ 270° (de -225° à +45°)
-    deg = -225 + pct * 270
+    # course -135° à +135°
+    deg = -135 + pct * 270
 
-    # Trick: on simule un "progress" arc en tournant un dashed ring (visuel)
     st.markdown(f"**{label}**")
     st.markdown(
         f"""
         <div class="knob-wrap">
-          <div style="position:relative; width:110px; height:110px;">
-            <div class="knob-arc"></div>
-            <div class="knob-progress" style="transform: rotate({deg}deg);"></div>
-            <div class="knob">
-              <div class="knob-dot"></div>
-            </div>
+          <div class="knob-shell">
+            <div class="knob-ticks"></div>
+            <div class="knob-ring"></div>
+            <div class="knob-needle" style="transform: rotate({deg:.1f}deg);"></div>
           </div>
           <div style="display:flex; flex-direction:column; gap:2px;">
-            <div style="font-size:22px; font-weight:800; line-height:1;">{value:,.0f}</div>
+            <div style="font-size:22px; font-weight:800; line-height:1;">{value_fmt.format(value)}</div>
             <div style="font-size:12px; opacity:0.7;">min {vmin:g} • max {vmax:g}</div>
           </div>
         </div>
@@ -282,29 +269,29 @@ def knob_visual(label: str, value: float, vmin: float, vmax: float):
         unsafe_allow_html=True,
     )
 
+
 # --------------------------------------------------
 # NAVIGATION
 # --------------------------------------------------
 page = st.sidebar.radio("Navigation", ["Simulateur", "Comment je modélise une courbe ?"])
 
 # ==================================================
-# PAGE 2 : EXPLICATION
+# PAGE 2
 # ==================================================
 if page == "Comment je modélise une courbe ?":
     st.title("Comment fonctionne le simulateur Waribei ?")
-    st.markdown("""
+    st.markdown(
+        """
 - Historique préchargé : **Jun 2025** et **Dec 2025**
 - Par défaut : **Jun 2026** avec tes valeurs target
 - Si tu changes la date vers une date “preset”, les valeurs se repositionnent automatiquement.
-""")
+"""
+    )
 
 # ==================================================
-# PAGE 1 : SIMULATEUR
+# PAGE 1
 # ==================================================
 else:
-    # --------------------------------------------------
-    # HEADER
-    # --------------------------------------------------
     top = st.columns([0.7, 0.3])
     with top[0]:
         st.title("Unit Economics – Waribei")
@@ -316,19 +303,13 @@ else:
 
     st.markdown("---")
 
-    # --------------------------------------------------
-    # LAYOUT PRINCIPAL
-    # On veut voir en premier:
-    #  - Hypothèses par transaction
-    #  - Variables de volume
-    # Et on déplace Inputs + Scénarios rapides + Date en bas à droite
-    # --------------------------------------------------
     main_left, main_right = st.columns([0.68, 0.32], gap="large")
 
     # =========================
-    # MAIN LEFT : Hypothèses par transaction
+    # LEFT: Hypothèses par transaction + Volumes + Opérationnel
     # =========================
     with main_left:
+        # ---- Hypothèses par transaction
         st.markdown('<div class="wb-card">', unsafe_allow_html=True)
         st.subheader("Hypothèses par transaction")
 
@@ -337,23 +318,29 @@ else:
             vbar_widget(
                 "Revenus / trx",
                 key="revenu_pct",
-                vmin=1.0, vmax=5.0, step=0.01,
+                vmin=1.0,
+                vmax=5.0,
+                step=0.01,
                 help_txt="Take-rate / commission moyenne.",
-                color_mode="rev",   # vert en haut, rouge en bas
+                color_mode="rev",
             )
         with c2:
             vbar_widget(
                 "Coût paiement / trx",
                 key="cout_paiement_pct",
-                vmin=0.0, vmax=2.0, step=0.01,
+                vmin=0.0,
+                vmax=2.0,
+                step=0.01,
                 help_txt="Coût des rails de paiement.",
-                color_mode="cost",  # rouge en haut, vert en bas
+                color_mode="cost",
             )
         with c3:
             vbar_widget(
                 "Coût liquidité (10j)",
                 key="cout_liquidite_10j_pct",
-                vmin=0.0, vmax=1.5, step=0.01,
+                vmin=0.0,
+                vmax=1.5,
+                step=0.01,
                 help_txt="Coût de financement sur 10 jours.",
                 color_mode="cost",
             )
@@ -361,26 +348,23 @@ else:
             vbar_widget(
                 "Défaut 30j / trx",
                 key="defaut_30j_pct",
-                vmin=0.0, vmax=5.0, step=0.01,
+                vmin=0.0,
+                vmax=5.0,
+                step=0.01,
                 help_txt="Perte attendue (net) à 30 jours.",
                 color_mode="cost",
             )
 
         st.markdown("</div>", unsafe_allow_html=True)
-
         st.markdown("")
 
-        # =========================
-        # Variables de volume + opérationnel (on peut les mettre sous le bloc principal)
-        # =========================
+        # ---- Variables de volume
         st.markdown('<div class="wb-card">', unsafe_allow_html=True)
         st.subheader("Variables de volume")
 
         vcol1, vcol2 = st.columns([0.58, 0.42], gap="large")
-
         with vcol1:
-            # Loan book : molette VISUELLE + input
-            knob_visual("Loan book moyen (k€)", float(st.session_state["loan_book_k"]), 50.0, 1000.0)
+            knob_simple_visual("Loan book moyen (k€)", float(st.session_state["loan_book_k"]), 50.0, 1000.0)
             st.number_input(
                 label="",
                 min_value=50.0,
@@ -390,8 +374,6 @@ else:
                 key="loan_book_k",
                 label_visibility="collapsed",
             )
-            st.caption("Encours moyen.")
-
         with vcol2:
             st.markdown("**Cycles de liquidité / mois**")
             st.caption("1 → 4")
@@ -406,12 +388,43 @@ else:
             )
 
         st.markdown("</div>", unsafe_allow_html=True)
+        st.markdown("")
+
+        # ---- Hypothèses opérationnelles (✅ remis)
+        st.markdown('<div class="wb-card">', unsafe_allow_html=True)
+        st.subheader("Hypothèses opérationnelles")
+
+        o1, o2 = st.columns(2, gap="large")
+        with o1:
+            knob_simple_visual("Valeur moyenne par prêt (€)", float(st.session_state["avg_loan_value_eur"]), 150.0, 1000.0)
+            st.number_input(
+                label="",
+                min_value=150.0,
+                max_value=1000.0,
+                step=50.0,
+                value=float(st.session_state["avg_loan_value_eur"]),
+                key="avg_loan_value_eur",
+                label_visibility="collapsed",
+            )
+        with o2:
+            knob_simple_visual("Transactions / client / mois", float(st.session_state["tx_per_client_per_month"]), 1.0, 12.0, value_fmt="{:,.1f}")
+            st.number_input(
+                label="",
+                min_value=1.0,
+                max_value=12.0,
+                step=0.5,
+                value=float(st.session_state["tx_per_client_per_month"]),
+                key="tx_per_client_per_month",
+                label_visibility="collapsed",
+            )
+
+        st.markdown("</div>", unsafe_allow_html=True)
 
     # =========================
-    # MAIN RIGHT : Outputs + petit panneau Inputs en bas
+    # RIGHT: Outputs + panel Inputs en bas
     # =========================
     with main_right:
-        # ------- CALCULS (moteur inchangé)
+        # --- CALCULS
         revenu_pct = float(st.session_state["revenu_pct"])
         cout_paiement_pct = float(st.session_state["cout_paiement_pct"])
         cout_liquidite_10j_pct = float(st.session_state["cout_liquidite_10j_pct"])
@@ -437,7 +450,7 @@ else:
         revenue_per_client_month_eur = revenue_per_loan_eur * tx_per_client_per_month
         take_rate_effective_pct = (monthly_revenue_eur / monthly_volume_eur * 100) if monthly_volume_eur > 0 else 0.0
 
-        # ------- OUTPUTS
+        # --- OUTPUTS
         st.subheader("Contribution")
 
         st.markdown(
@@ -453,7 +466,6 @@ else:
         )
 
         st.markdown("")
-
         st.markdown(
             f"""
             <div style="border:2px solid #1B5A43; padding:14px; border-radius:12px;
@@ -465,11 +477,9 @@ else:
             """,
             unsafe_allow_html=True,
         )
-
         st.caption(f"Coût de liquidité annualisé ≈ **{taux_liquidite_annuel_pct:.1f}%**")
 
         st.markdown("")
-
         st.subheader("Revenus")
         r1, r2 = st.columns(2)
         with r1:
@@ -486,7 +496,6 @@ else:
         st.caption(f"Take-rate effectif ≈ {take_rate_effective_pct:.2f}% sur {monthly_volume_eur:,.0f} € / mois.")
 
         st.markdown("")
-
         st.subheader("Volumes nécessaires / mois")
         m1, m2 = st.columns(2)
         with m1:
@@ -497,7 +506,7 @@ else:
         st.markdown("---")
 
         # =========================
-        # PANEL BAS DROITE : Inputs + Scénarios rapides + Date
+        # Panel bas droite: Inputs + scénarios rapides + date
         # =========================
         st.markdown('<div class="wb-card">', unsafe_allow_html=True)
         st.markdown("### Inputs")
@@ -543,7 +552,6 @@ else:
         with dcols[0]:
             picked = st.date_input("Date", value=st.session_state.get("scenario_date", DEFAULT_DATE))
             st.session_state["scenario_date"] = picked
-
         apply_preset_for_date(st.session_state["scenario_date"], force=False)
 
         default_label = st.session_state.get("scenario_name_autofill", "Scenario")
@@ -610,6 +618,7 @@ else:
 
         return pd.DataFrame({"step": steps, "value": values, "start": start, "end": end, "type": types})
 
+
     st.markdown("### Décomposition par transaction (waterfall)")
     wf_df = make_waterfall_df(
         float(st.session_state["revenu_pct"]),
@@ -617,10 +626,10 @@ else:
         float(st.session_state["cout_liquidite_10j_pct"]),
         float(st.session_state["defaut_30j_pct"]),
         float(st.session_state["revenu_pct"]) - (
-            float(st.session_state["cout_paiement_pct"]) +
-            float(st.session_state["cout_liquidite_10j_pct"]) +
-            float(st.session_state["defaut_30j_pct"])
-        )
+            float(st.session_state["cout_paiement_pct"])
+            + float(st.session_state["cout_liquidite_10j_pct"])
+            + float(st.session_state["defaut_30j_pct"])
+        ),
     )
 
     color_scale = alt.Scale(domain=["positive", "negative", "total"], range=["#1B5A43", "#F83131", "#064C72"])
