@@ -40,6 +40,77 @@ DEFAULT_DATE = date(2026, 6, 1)
 HISTORY_DATES = [date(2025, 6, 1), date(2025, 12, 1), date(2026, 6, 1)]
 
 # --------------------------------------------------
+# SCÉNARIOS RAPIDES (hard-coded)
+# --------------------------------------------------
+SCENARIOS_PRESETS = {
+    "Custom": None,
+
+    "Base scénario — Aujourd’hui": {
+        "revenu_pct": 3.80,
+        "cout_paiement_pct": 1.60,
+        "cout_liquidite_10j_pct": 0.40,
+        "defaut_30j_pct": 1.00,
+        "loan_book_k": 800.0,
+        "cycles_per_month": 2.9,
+        # optionnel: si tu veux aussi pré-remplir
+        "scenario_name_autofill": "Base scénario — Aujourd’hui",
+    },
+
+    "Scénario 1 — Optimisation légère": {
+        "revenu_pct": 3.80,
+        "cout_paiement_pct": 1.20,
+        "cout_liquidite_10j_pct": 0.40,
+        "defaut_30j_pct": 1.00,
+        "loan_book_k": 530.0,
+        "cycles_per_month": 2.9,
+        "scenario_name_autofill": "Scénario 1 — Optimisation légère",
+    },
+
+    "Scénario 2 — Open Banking": {
+        "revenu_pct": 3.80,
+        "cout_paiement_pct": 0.50,
+        "cout_liquidite_10j_pct": 0.40,
+        "defaut_30j_pct": 0.62,
+        "loan_book_k": 280.0,
+        "cycles_per_month": 3.0,
+        "scenario_name_autofill": "Scénario 2 — Open Banking",
+    },
+
+    "Scénario 3 — Tenure 15j + OB": {
+        "revenu_pct": 4.00,
+        "cout_paiement_pct": 0.50,
+        # NOTE: tu as mis 0.50% ici (vs 0.40% dans les autres) -> je respecte ton tableau.
+        # Si tu veux modéliser le 15j proprement, il faudrait ajuster via DUREE_PERIODE_LIQUIDITE_JOURS.
+        "cout_liquidite_10j_pct": 0.50,
+        "defaut_30j_pct": 0.65,
+        "loan_book_k": 290.0,
+        "cycles_per_month": 2.7,
+        "scenario_name_autofill": "Scénario 3 — Tenure 15j + OB",
+    },
+
+    "Scénario Seed": {
+        "revenu_pct": 3.77,
+        "cout_paiement_pct": 1.38,
+        "cout_liquidite_10j_pct": 0.34,
+        "defaut_30j_pct": 1.26,
+        # ton tableau n’a pas donné loan_book/cycles pour Seed -> je laisse volontairement inchangé
+        "loan_book_k": 294.0,
+        "cycles_per_month": 3.3,
+        "scenario_name_autofill": "Scénario Seed",
+    },
+}
+
+
+def apply_scenario_preset(name: str):
+    """Applique un scénario hard-coded (trx + volume si présent)."""
+    preset = SCENARIOS_PRESETS.get(name)
+    if not preset:
+        return
+
+    for k, v in preset.items():
+        st.session_state[k] = float(v) if isinstance(v, (int, float)) else v
+
+# --------------------------------------------------
 # SESSION STATE
 # --------------------------------------------------
 if "scenarios" not in st.session_state:
@@ -463,36 +534,13 @@ else:
 
         scenario = st.selectbox(
             "Scénarios rapides",
-            [
-                "Custom",
-                "Aujourd'hui",
-                "Open Banking",
-                "Supplier funding",
-                "OB + Supplier (défaut bon 0,8%)",
-                "OB + Supplier (défaut moyen 1,2%)",
-                "OB + Supplier (défaut mauvais 2,0%)",
-            ],
+            list(SCENARIOS_PRESETS.keys()),
         )
         st.caption("Choisis un scénario puis ajuste les curseurs.")
+        
+        if scenario != "Custom":
+            apply_scenario_preset(scenario)
 
-        if scenario == "Aujourd'hui":
-            apply_preset_for_date(date(2026, 6, 1), force=True)
-        elif scenario == "Open Banking":
-            st.session_state["cout_paiement_pct"] = 0.5
-        elif scenario == "Supplier funding":
-            st.session_state["cout_liquidite_10j_pct"] = 0.055
-        elif scenario == "OB + Supplier (défaut bon 0,8%)":
-            st.session_state["cout_paiement_pct"] = 0.5
-            st.session_state["cout_liquidite_10j_pct"] = 0.055
-            st.session_state["defaut_30j_pct"] = 0.8
-        elif scenario == "OB + Supplier (défaut moyen 1,2%)":
-            st.session_state["cout_paiement_pct"] = 0.5
-            st.session_state["cout_liquidite_10j_pct"] = 0.055
-            st.session_state["defaut_30j_pct"] = 1.2
-        elif scenario == "OB + Supplier (défaut mauvais 2,0%)":
-            st.session_state["cout_paiement_pct"] = 0.5
-            st.session_state["cout_liquidite_10j_pct"] = 0.055
-            st.session_state["defaut_30j_pct"] = 2.0
 
         dcols = st.columns([0.72, 0.28])
         with dcols[1]:
