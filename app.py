@@ -102,13 +102,27 @@ SCENARIOS_PRESETS = {
 
 
 def apply_scenario_preset(name: str):
-    """Applique un scénario hard-coded (trx + volume si présent)."""
+    """Applique un scénario hard-coded (trx + volume si présent). Doit être appelé AVANT la création des widgets."""
     preset = SCENARIOS_PRESETS.get(name)
     if not preset:
         return
 
+    # On n'applique que des clés connues (évite d'écraser des trucs inattendus)
+    allowed = {
+        "revenu_pct",
+        "cout_paiement_pct",
+        "cout_liquidite_10j_pct",
+        "defaut_30j_pct",
+        "loan_book_k",
+        "cycles_per_month",
+        "scenario_name_autofill",
+    }
+
     for k, v in preset.items():
-        st.session_state[k] = float(v) if isinstance(v, (int, float)) else v
+        if k not in allowed:
+            continue
+        st.session_state[k] = v
+
 
 # --------------------------------------------------
 # SESSION STATE
@@ -350,6 +364,15 @@ else:
 
     st.markdown("---")
 
+    # --------------------------------------------------
+    # APPLY PENDING SCENARIO (avant widgets)
+    # --------------------------------------------------
+    if "pending_scenario" in st.session_state and st.session_state.pending_scenario:
+        apply_scenario_preset(st.session_state.pending_scenario)
+        # important : on consomme l'action pour éviter de ré-appliquer à chaque rerun
+        st.session_state.pending_scenario = None
+
+    
     main_left, main_right = st.columns([0.68, 0.32], gap="large")
 
     # =========================
@@ -538,8 +561,13 @@ else:
         )
         st.caption("Choisis un scénario puis ajuste les curseurs.")
         
+        if "pending_scenario" not in st.session_state:
+            st.session_state.pending_scenario = None
+        
         if scenario != "Custom":
-            apply_scenario_preset(scenario)
+            st.session_state.pending_scenario = scenario
+            st.rerun()
+
 
 
         dcols = st.columns([0.72, 0.28])
