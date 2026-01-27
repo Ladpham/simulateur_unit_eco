@@ -142,7 +142,7 @@ for k, default_val in [
     ("cout_liquidite_10j_pct", 0.55),
     ("defaut_30j_pct", 1.7),
     ("cycles_per_month", 2.9),
-    ("loan_book_k", 100.0),
+    ("loan_book_k", 300.0),
     ("avg_loan_value_eur", 300.0),
     ("tx_per_client_per_month", 2.9),
 ]:
