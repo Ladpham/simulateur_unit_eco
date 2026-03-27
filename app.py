@@ -402,7 +402,7 @@ else:
 
         vcol1, vcol2 = st.columns([0.58, 0.42], gap="large")
         with vcol1:
-            knob_simple_visual("Loan book moyen (k€)", float(st.session_state["loan_book_k"]), 50.0, 1000.0)
+            knob_simple_visual("Loan book moyen (k€)", float(st.session_state["loan_book_k"]), 50.0, 10000.0)
             # ✅ Slider en dessous de la molette
             st.slider(
                 label="",
