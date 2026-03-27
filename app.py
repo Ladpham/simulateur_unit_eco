@@ -407,7 +407,7 @@ else:
             st.slider(
                 label="",
                 min_value=50.0,
-                max_value=1000.0,
+                max_value=10000.0,
                 value=float(st.session_state["loan_book_k"]),
                 step=10.0,
                 key="loan_book_k",
